@@ -35,12 +35,12 @@ env/
 # 数据集 - 不提交到远端
 road_vehicle_pedestrian_det_datasets/
 
-# 输出文件 - 模型文件太大不提交
+# 输出文件 - 使用Git LFS管理模型文件
 outputs/logs/
 outputs/masks/
 outputs/test_results/
 outputs/visualizations/
-outputs/checkpoints/
+# checkpoints使用Git LFS管理
 
 # 系统文件
 .DS_Store
