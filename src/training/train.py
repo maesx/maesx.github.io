@@ -135,6 +135,12 @@ class Trainer:
         # Early Stopping设置
         self.patience: int = args.early_stopping_patience
         self.patience_counter: int = 0
+        
+        # 智能学习率调整设置
+        self.min_lr: float = args.min_lr  # 最小学习率
+        self.prev_val_iou: float = 0.0  # 前一个epoch的验证IoU
+        self.lr_adjustment_counter: int = 0  # 学习率调整计数器
+        self.lr_adjustment_factor: float = args.lr_adjustment_factor  # 学习率调整因子
 
         self._print_config()
 
@@ -366,6 +372,34 @@ class Trainer:
 
         return avg_loss, avg_iou, avg_acc
 
+    def _adjust_learning_rate_on_iou_drop(self, val_iou: float) -> None:
+        """
+        当IoU下降时智能调整学习率
+        
+        Args:
+            val_iou: 当前验证IoU
+        """
+        current_lr = self.optimizer.param_groups[0]['lr']
+        
+        # 如果当前IoU比之前低,且学习率还未达到最小值
+        if val_iou < self.prev_val_iou and current_lr > self.min_lr:
+            # 计算新的学习率
+            new_lr = max(current_lr * self.lr_adjustment_factor, self.min_lr)
+            
+            # 如果新学习率与当前学习率不同
+            if new_lr != current_lr:
+                for param_group in self.optimizer.param_groups:
+                    param_group['lr'] = new_lr
+                
+                self.lr_adjustment_counter += 1
+                print(f"\n📉 检测到IoU下降 ({self.prev_val_iou:.4f} -> {val_iou:.4f})")
+                print(f"   学习率调整: {current_lr:.6f} -> {new_lr:.6f}")
+                print(f"   累计调整次数: {self.lr_adjustment_counter}")
+                self.logger.info(f"IoU下降,学习率从{current_lr:.6f}调整到{new_lr:.6f}")
+        
+        # 更新前一个epoch的验证IoU
+        self.prev_val_iou = val_iou
+
     def train(self) -> None:
         """
         完整训练流程
@@ -387,6 +421,9 @@ class Trainer:
 
             # 验证
             val_loss, val_iou, val_acc = self.validate(epoch)
+
+            # 智能学习率调整:当IoU下降时调整学习率
+            self._adjust_learning_rate_on_iou_drop(val_iou)
 
             # 学习率调整
             self.scheduler.step(val_iou)
@@ -507,6 +544,12 @@ def main() -> None:
     # Early Stopping参数
     parser.add_argument('--early_stopping_patience', type=int, default=10,
                         help='Early Stopping的耐心值,连续多少轮验证IoU未提升则停止训练 (默认: 10)')
+    
+    # 智能学习率调整参数
+    parser.add_argument('--min_lr', type=float, default=3e-5,
+                        help='最小学习率,防止学习率过低导致过拟合 (默认: 3e-5)')
+    parser.add_argument('--lr_adjustment_factor', type=float, default=0.6,
+                        help='学习率调整因子,当IoU下降时学习率乘以该因子 (默认: 0.6)')
 
     args = parser.parse_args()
 
