@@ -1,0 +1,77 @@
+{
+  "description": "训练暂停配置 - 2026-04-08",
+  "training_status": {
+    "current_epoch": 3,
+    "total_epochs": 30,
+    "completed_epochs": 3,
+    "paused_at": "2026-04-08 14:48:29"
+  },
+  "best_performance": {
+    "epoch": 3,
+    "val_iou": 0.7355,
+    "val_loss": 0.8025,
+    "val_acc": 0.9444
+  },
+  "training_history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.3499,
+      "train_iou": 0.5894,
+      "train_acc": 0.8628,
+      "val_loss": 0.9510,
+      "val_iou": 0.7066,
+      "val_acc": 0.9250
+    },
+    {
+      "epoch": 2,
+      "train_loss": 1.0296,
+      "train_iou": 0.6908,
+      "train_acc": 0.8967,
+      "val_loss": 0.8544,
+      "val_iou": 0.7241,
+      "val_acc": 0.9347
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.9766,
+      "train_iou": 0.7039,
+      "train_acc": 0.9038,
+      "val_loss": 0.8025,
+      "val_iou": 0.7355,
+      "val_acc": 0.9444
+    }
+  ],
+  "command_args": {
+    "use_gpu": true,
+    "subset_ratio": 0.6,
+    "epochs": 30,
+    "batch_size": 8,
+    "learning_rate": 0.0001,
+    "save_interval": 5,
+    "early_stopping_patience": 8,
+    "num_workers": 0,
+    "device": "mps"
+  },
+  "class_weights": {
+    "background": 0.0165,
+    "road": 0.1515,
+    "vehicle": 12.0,
+    "pedestrian": 2.6596
+  },
+  "model_config": {
+    "architecture": "UNet++",
+    "encoder": "vgg19",
+    "pretrained": true,
+    "deep_supervision": true,
+    "num_classes": 4,
+    "in_channels": 3
+  },
+  "resume_command": "python3 src/training/train.py --use_gpu True --subset_ratio 0.6 --epochs 30 --save_interval 5 --early_stopping_patience 8 --num_workers 0 --resume outputs/checkpoints/best_model.pth",
+  "notes": [
+    "已修复MPS CrossEntropyLoss bug，需要在CPU计算后移回MPS",
+    "训练进程已暂停，PID=34378，使用 'kill -CONT 34378' 恢复",
+    "最佳模型保存在 outputs/checkpoints/best_model.pth"
+  ]
+}
+
+

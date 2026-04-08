@@ -22,6 +22,9 @@ class DiceLoss(nn.Module):
             pred: 预测结果 [B, C, H, W]
             target: 真实标签 [B, H, W]
         """
+        # 确保target是long类型
+        target = target.long()
+        
         # 转为one-hot编码
         num_classes = pred.size(1)
         target_one_hot = F.one_hot(target, num_classes=num_classes)
@@ -43,22 +46,37 @@ class DiceLoss(nn.Module):
 
 
 class CombinedLoss(nn.Module):
-    """组合损失: CrossEntropy + Dice"""
+    """组合损失: CrossEntropy + Dice
+    
+    注意: 在MPS设备上，CrossEntropyLoss有已知的bus error问题，
+    因此需要在CPU上计算后再移回原设备
+    """
 
     def __init__(
         self, 
         weight_ce: float = 1.0, 
-        weight_dice: float = 1.0
+        weight_dice: float = 1.0,
+        class_weights: Optional[torch.Tensor] = None
     ) -> None:
         """
         Args:
             weight_ce: CrossEntropy 损失权重
             weight_dice: Dice 损失权重
+            class_weights: 类别权重 [C]
         """
         super(CombinedLoss, self).__init__()
         self.weight_ce = weight_ce
         self.weight_dice = weight_dice
-        self.ce_loss = nn.CrossEntropyLoss()
+        if class_weights is not None:
+            self.register_buffer('class_weights', class_weights)
+        else:
+            self.class_weights = None
+        
+        # CrossEntropyLoss在初始化时不需要权重在CPU上
+        if class_weights is not None:
+            self.ce_loss = nn.CrossEntropyLoss(weight=class_weights.cpu())
+        else:
+            self.ce_loss = nn.CrossEntropyLoss()
         self.dice_loss = DiceLoss()
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -67,7 +85,17 @@ class CombinedLoss(nn.Module):
             pred: 预测结果 [B, C, H, W]
             target: 真实标签 [B, H, W]
         """
-        ce = self.ce_loss(pred, target)
+        # 检查是否是MPS设备，如果是则在CPU上计算CrossEntropy
+        device = pred.device
+        if device.type == 'mps':
+            # 在CPU上计算CrossEntropy
+            pred_cpu = pred.cpu()
+            target_cpu = target.cpu().long()  # 确保是long类型
+            ce = self.ce_loss(pred_cpu, target_cpu)
+            ce = ce.to(device)  # 移回原设备
+        else:
+            ce = self.ce_loss(pred, target)
+        
         dice = self.dice_loss(pred, target)
         
         return self.weight_ce * ce + self.weight_dice * dice

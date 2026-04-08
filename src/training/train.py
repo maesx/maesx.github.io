@@ -1,6 +1,6 @@
 """
 训练脚本
-支持CPU和GPU训练，支持混合精度训练(AMP)
+支持CPU和GPU训练
 """
 import argparse
 import logging
@@ -14,7 +14,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -30,7 +29,7 @@ from src.utils.logging_config import get_training_logger
 
 
 class Trainer:
-    """训练器，支持混合精度训练和梯度裁剪"""
+    """训练器"""
 
     def __init__(self, args: argparse.Namespace) -> None:
         """
@@ -66,9 +65,7 @@ class Trainer:
                 img_size=tuple(args.img_size),
                 num_workers=args.num_workers,
                 subset_ratio=args.subset_ratio,
-                random_seed=args.random_seed,
-                use_cache=args.use_cache,
-                cache_size=args.cache_size
+                random_seed=args.random_seed
             )
 
             self.val_loader: DataLoader = get_dataloader(
@@ -79,9 +76,7 @@ class Trainer:
                 img_size=tuple(args.img_size),
                 num_workers=args.num_workers,
                 subset_ratio=args.subset_ratio,
-                random_seed=args.random_seed,
-                use_cache=args.use_cache,
-                cache_size=args.cache_size
+                random_seed=args.random_seed
             )
         except Exception as e:
             self.logger.error(f"数据加载失败: {e}")
@@ -100,10 +95,7 @@ class Trainer:
         self.model = self.model.to(self.device)
 
         # 创建损失函数
-        base_loss = CombinedLoss(
-            weight_ce=1.0, 
-            weight_dice=1.0
-        )
+        base_loss = CombinedLoss(weight_ce=1.0, weight_dice=1.0)
         if args.deep_supervision:
             self.criterion: nn.Module = DeepSupervisionLoss(base_loss)
         else:
@@ -123,22 +115,6 @@ class Trainer:
             factor=0.5,
             patience=5
         )
-
-        # 混合精度训练设置
-        self.use_amp = args.use_amp and self.device.type in ['cuda', 'mps']
-        if self.use_amp:
-            # 使用设备类型参数初始化 GradScaler (参数名是 device)
-            self.scaler = GradScaler(device=self.device.type)
-            print(f"混合精度训练已启用 (设备: {self.device.type})")
-            self.logger.info(f"混合精度训练已启用 (设备: {self.device.type})")
-        else:
-            self.scaler = None
-            if args.use_amp:
-                print(f"⚠ 混合精度训练仅支持 CUDA/MPS 设备，当前设备: {self.device.type}")
-                self.logger.warning(f"混合精度训练仅支持 CUDA/MPS 设备，当前设备: {self.device.type}")
-
-        # 梯度裁剪设置
-        self.grad_clip_norm = args.grad_clip_norm
 
         # 创建TensorBoard日志
         log_dir = os.path.join(args.output_dir, 'logs', datetime.now().strftime('%Y%m%d_%H%M%S'))
@@ -247,10 +223,7 @@ class Trainer:
         print(f"  - 图像尺寸: {self.args.img_size}")
         print(f"  - 类别数: {self.args.num_classes}")
         print(f"  - 深度监督: {self.args.deep_supervision}")
-        print(f"  - 混合精度(AMP): {'启用' if self.use_amp else '禁用'}")
-        print(f"  - 梯度裁剪: {self.grad_clip_norm if self.grad_clip_norm > 0 else '禁用'}")
-        print(f"  - 数据缓存: {'启用' if self.args.use_cache else '禁用'}")
-        self.logger.info(f"训练配置: batch_size={self.args.batch_size}, lr={self.args.lr}, epochs={self.args.epochs}, amp={self.use_amp}")
+        self.logger.info(f"训练配置: batch_size={self.args.batch_size}, lr={self.args.lr}, epochs={self.args.epochs}")
 
     def train_epoch(self, epoch: int) -> Tuple[float, float, float]:
         """
@@ -284,38 +257,16 @@ class Trainer:
             images = images.to(self.device)
             masks = masks.to(self.device)
 
-            # 前向传播（使用混合精度）
+            # 前向传播
             self.optimizer.zero_grad()
-            
-            if self.use_amp:
-                # 混合精度训练
-                with autocast(device_type=self.device.type):
-                    outputs = self.model(images)
-                    loss = self.criterion(outputs, masks)
-                
-                # 反向传播（使用 GradScaler）
-                self.scaler.scale(loss).backward()
-                
-                # 梯度裁剪（在 unscale 之后）
-                if self.grad_clip_norm > 0:
-                    self.scaler.unscale_(self.optimizer)
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip_norm)
-                
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-            else:
-                # 普通训练
-                outputs = self.model(images)
-                loss = self.criterion(outputs, masks)
-                
-                # 反向传播
-                loss.backward()
-                
-                # 梯度裁剪
-                if self.grad_clip_norm > 0:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip_norm)
-                
-                self.optimizer.step()
+            outputs = self.model(images)
+
+            # 计算损失
+            loss = self.criterion(outputs, masks)
+
+            # 反向传播
+            loss.backward()
+            self.optimizer.step()
 
             # 计算指标
             if isinstance(outputs, list):
@@ -378,14 +329,11 @@ class Trainer:
                 images = images.to(self.device)
                 masks = masks.to(self.device)
 
-                # 前向传播（使用混合精度）
-                if self.use_amp:
-                    with autocast(device_type=self.device.type):
-                        outputs = self.model(images)
-                        loss = self.criterion(outputs, masks)
-                else:
-                    outputs = self.model(images)
-                    loss = self.criterion(outputs, masks)
+                # 前向传播
+                outputs = self.model(images)
+
+                # 计算损失
+                loss = self.criterion(outputs, masks)
 
                 # 计算指标
                 if isinstance(outputs, list):
@@ -474,7 +422,10 @@ class Trainer:
             # 验证
             val_loss, val_iou, val_acc = self.validate(epoch)
 
-            # 学习率调整 (只使用ReduceLROnPlateau)
+            # 智能学习率调整:当IoU下降时调整学习率
+            self._adjust_learning_rate_on_iou_drop(val_iou)
+
+            # 学习率调整
             self.scheduler.step(val_iou)
 
             # 保存最佳模型并检查Early Stopping
@@ -546,13 +497,13 @@ def main() -> None:
     # 模型参数
     parser.add_argument('--num_classes', type=int, default=4,
                         help='分割类别数(包括背景)')
-    parser.add_argument('--no_deep_supervision', action='store_true',
-                        help='不使用深度监督')
+    parser.add_argument('--deep_supervision', type=bool, default=True,
+                        help='是否使用深度监督')
     parser.add_argument('--encoder', type=str, default='vgg19',
                         choices=['vgg19', 'vgg19_bn'],
                         help='编码器类型')
-    parser.add_argument('--no_pretrained', action='store_true',
-                        help='不使用预训练权重')
+    parser.add_argument('--pretrained', type=bool, default=True,
+                        help='是否使用预训练权重')
 
     # 训练参数
     parser.add_argument('--batch_size', type=int, default=8,
@@ -569,12 +520,12 @@ def main() -> None:
                         help='数据加载工作进程数')
 
     # 设备参数
-    parser.add_argument('--use_gpu', action='store_true',
-                        help='使用GPU训练 (默认CPU，会优先使用MPS，然后CUDA)')
+    parser.add_argument('--use_gpu', type=bool, default=False,
+                        help='是否使用GPU训练 (默认: False, 使用CPU，如果为True会优先使用MPS，然后CUDA)')
 
     # 数据子集参数
     parser.add_argument('--subset_ratio', type=float, default=1.0,
-                        help='使用数据集的比例 (0.0-1.0)，例如0.1表示使用10%的数据 (默认: 1.0全部数据)')
+                        help='使用数据集的比例 (0.0-1.0)，例如0.1表示使用10%%的数据 (默认: 1.0全部数据)')
     parser.add_argument('--random_seed', type=int, default=42,
                         help='数据子集随机种子，用于可重复的数据选择 (默认: 42)')
 
@@ -600,29 +551,7 @@ def main() -> None:
     parser.add_argument('--lr_adjustment_factor', type=float, default=0.6,
                         help='学习率调整因子,当IoU下降时学习率乘以该因子 (默认: 0.6)')
 
-    # ===== 新增优化参数 =====
-    
-    # 混合精度训练参数
-    parser.add_argument('--no_amp', action='store_true',
-                        help='不使用混合精度训练(AMP) (默认使用AMP，需要GPU支持)')
-    
-    # 梯度裁剪参数
-    parser.add_argument('--grad_clip_norm', type=float, default=1.0,
-                        help='梯度裁剪的最大范数值，0表示禁用 (默认: 1.0)')
-    
-    # 数据缓存参数
-    parser.add_argument('--no_cache', action='store_true',
-                        help='不使用LRU缓存加速数据加载 (默认使用)')
-    parser.add_argument('--cache_size', type=int, default=1000,
-                        help='LRU缓存的最大容量 (默认: 1000)')
-
     args = parser.parse_args()
-
-    # 处理布尔参数的转换
-    args.deep_supervision = not args.no_deep_supervision
-    args.pretrained = not args.no_pretrained
-    args.use_amp = not args.no_amp
-    args.use_cache = not args.no_cache
 
     # 创建输出目录
     os.makedirs(os.path.join(args.output_dir, 'checkpoints'), exist_ok=True)
