@@ -1,7 +1,7 @@
 """
 损失函数和评估指标
 """
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -45,7 +45,16 @@ class DiceLoss(nn.Module):
 class CombinedLoss(nn.Module):
     """组合损失: CrossEntropy + Dice"""
 
-    def __init__(self, weight_ce: float = 1.0, weight_dice: float = 1.0) -> None:
+    def __init__(
+        self, 
+        weight_ce: float = 1.0, 
+        weight_dice: float = 1.0
+    ) -> None:
+        """
+        Args:
+            weight_ce: CrossEntropy 损失权重
+            weight_dice: Dice 损失权重
+        """
         super(CombinedLoss, self).__init__()
         self.weight_ce = weight_ce
         self.weight_dice = weight_dice
