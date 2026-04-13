@@ -40,10 +40,14 @@ def create_app(config_class=Config):
     
     # 注册路由
     from src.web.backend.routes.models import ModelsResource, ModelDetailResource, ModelUploadResource
-    from src.web.backend.routes.segment import SegmentResource, BatchSegmentResource, SegmentHistoryResource
+    from src.web.backend.routes.segment import (
+        SegmentResource, BatchSegmentResource, SegmentHistoryResource,
+        CompareListResource, CompareAddResource, CompareRemoveResource, CompareClearResource,
+        BatchDownloadResource
+    )
     from src.web.backend.routes.visualization import VisualizationResource, GPUMonitorResource
     from src.web.backend.routes.auth import LoginResource
-    from src.web.backend.routes.augmentation import AugmentationPreviewResource
+    from src.web.backend.routes.augmentation import AugmentationPreviewResource, AugmentationDownloadResource
     
     # API路由
     api.add_resource(LoginResource, '/api/login')
@@ -56,7 +60,14 @@ def create_app(config_class=Config):
     # 图像分割
     api.add_resource(SegmentResource, '/api/segment')
     api.add_resource(BatchSegmentResource, '/api/segment/batch')
+    api.add_resource(BatchDownloadResource, '/api/segment/download/<string:task_id>')
     api.add_resource(SegmentHistoryResource, '/api/segment/history')
+    
+    # 结果对比
+    api.add_resource(CompareListResource, '/api/segment/compare/list')
+    api.add_resource(CompareAddResource, '/api/segment/compare/add/<string:result_id>')
+    api.add_resource(CompareRemoveResource, '/api/segment/compare/<string:item_id>')
+    api.add_resource(CompareClearResource, '/api/segment/compare/clear')
     
     # 可视化
     api.add_resource(VisualizationResource, '/api/visualization/<string:result_id>')
@@ -64,6 +75,7 @@ def create_app(config_class=Config):
     
     # 数据增强预览
     api.add_resource(AugmentationPreviewResource, '/api/augmentation/preview')
+    api.add_resource(AugmentationDownloadResource, '/api/augmentation/download')
     
     # 健康检查
     @app.route('/api/health', methods=['GET'])

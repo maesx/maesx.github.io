@@ -13,3 +13,5 @@ from src.training.train import main
 
 if __name__ == '__main__':
     main()
+
+#python3 src/training/train.py --use_gpu True --subset_ratio 0.6 --epochs 30 --save_interval 5 --early_stopping_patience 8 --num_workers 0 --resume outputs/checkpoints/best_model.pth

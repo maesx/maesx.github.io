@@ -2,24 +2,79 @@
 
 ## 项目概述
 
-基于U-Net++架构的道路车辆语义分割系统,能够从道路场景图像中精确分割出不同类型的车辆(car、truck、bus)。
+基于U-Net++架构的道路车辆语义分割系统，支持 Web 可视化平台，跨平台部署（Windows、macOS、Linux）。
 
 ### 主要特性
 
-- ✅ **U-Net++架构**: 采用Nested U-Net结构,具有更好的特征融合能力
-- ✅ **深度监督**: 使用深度监督策略加速收敛,提升性能
+- ✅ **U-Net++架构**: 采用Nested U-Net结构，具有更好的特征融合能力
+- ✅ **深度监督**: 使用深度监督策略加速收敛，提升性能
+- ✅ **Web可视化**: 提供直观的Web界面进行图像分割和结果可视化
+- ✅ **跨平台支持**: 支持 Windows、macOS、Linux 部署
+- ✅ **GPU加速**: 支持 NVIDIA GPU (CUDA) 和 Apple Silicon (MPS)
 - ✅ **数据增强**: 丰富的数据增强策略(翻转、旋转、缩放、弹性形变等)
-- ✅ **组合损失**: 结合CrossEntropy和Dice损失,提升分割精度
-- ✅ **CPU/GPU支持**: 支持CPU和GPU训练,方便在不同环境部署
+- ✅ **组合损失**: 结合CrossEntropy和Dice损失，提升分割精度
 - ✅ **目标IoU**: 训练目标IoU≥80%
+
+## 快速开始
+
+### 方式一：Web可视化平台（推荐）
+
+#### Windows
+```cmd
+# 双击运行
+start_windows.bat
+
+# 或命令行运行
+python start_server.py
+```
+
+#### macOS / Linux
+```bash
+# 一键启动
+python3 start_server.py
+
+# 或使用脚本
+./restart_services.sh
+```
+
+访问：http://localhost:3000
+
+详细说明请查看 [SCRIPTS.md](SCRIPTS.md)
+
+#### 方式二：命令行工具
+
+训练和推理使用传统的命令行方式，详见下文。
+
+## 系统要求
+
+### 硬件要求
+
+| 组件 | 最低配置 | 推荐配置 |
+|------|----------|----------|
+| CPU | 4核心 | 8核心+ |
+| 内存 | 8GB | 16GB+ |
+| 硬盘 | 5GB | 10GB SSD |
+| 显卡 | 无要求 | NVIDIA GPU / Apple Silicon |
+
+### 软件要求
+
+- Python 3.8+
+- Node.js 16+
+- CUDA Toolkit（可选，用于 NVIDIA GPU）
+
+详细要求请查看 [REQUIREMENTS.md](REQUIREMENTS.md)
 
 ## 项目结构
 
 ```
-maesx.github.io-master/
+maesx.github.io/
 ├── README.md                  # 项目入口文档
-├── CLAUDE.md                  # AI 助手指引
+├── REQUIREMENTS.md            # 系统要求说明
+├── SCRIPTS.md                 # 启动脚本说明
 ├── requirements.txt           # Python 依赖
+├── start_server.py            # 统一启动脚本（跨平台）
+├── start_windows.bat          # Windows 启动脚本
+├── restart_services.sh        # macOS/Linux 启动脚本
 ├── train.py                   # 训练入口脚本
 ├── inference.py               # 推理入口脚本
 ├── configs/                   # 配置文件
@@ -49,13 +104,24 @@ maesx.github.io-master/
 │   │   ├── inference.py
 │   │   ├── inference_enhanced.py
 │   │   └── inference_instance.py
-│   └── training/              # 训练模块
-│       └── train.py
+│   ├── training/              # 训练模块
+│   │   └── train.py
+│   └── web/                   # Web可视化平台
+│       ├── backend/           # Flask后端
+│       │   ├── app.py
+│       │   ├── config.py
+│       │   └── routes/
+│       └── frontend/          # Vue前端
+│           ├── src/
+│           ├── vite.config.js
+│           └── package.json
 ├── outputs/                   # 输出目录
 │   ├── masks/                 # 转换后的分割掩码
 │   ├── checkpoints/           # 模型检查点
 │   ├── logs/                  # TensorBoard日志
-│   └── visualizations/        # 可视化结果
+│   ├── visualizations/        # 可视化结果
+│   ├── uploads/               # 上传的图像
+│   └── results/               # 分割结果
 └── road_vehicle_pedestrian_det_datasets/  # 数据集
     ├── images/
     ├── labels/
@@ -66,8 +132,28 @@ maesx.github.io-master/
 
 ### 1. 安装依赖
 
+#### Python 依赖
+
 ```bash
+# macOS / Linux
 pip install -r requirements.txt
+
+# Windows
+python -m pip install -r requirements.txt
+```
+
+#### CUDA 支持（可选，NVIDIA GPU）
+
+```bash
+# 安装支持 CUDA 的 PyTorch
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+#### Node.js 依赖（Web平台）
+
+```bash
+cd src/web/frontend
+npm install
 ```
 
 ### 2. 数据准备

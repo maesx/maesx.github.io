@@ -64,7 +64,13 @@ class ModelService:
             created_time = datetime.fromtimestamp(file_stat.st_mtime)
             
             # 尝试加载模型获取详细信息
-            checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
+            try:
+                # 第一次尝试使用 weights_only=True（更安全）
+                checkpoint = torch.load(model_path, map_location='cpu', weights_only=True)
+            except Exception as e:
+                # 如果失败，使用 weights_only=False（需要信任文件来源）
+                print(f"[ModelService] Warning: weights_only load failed for {os.path.basename(model_path)}, using full load: {e}")
+                checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
             
             model_info = {
                 'name': os.path.basename(model_path).replace('.pth', ''),
@@ -129,8 +135,14 @@ class ModelService:
         
         model_path = model_files[0]
         
-        # 加载模型
-        checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
+        # 加载模型 - 使用与 _get_model_info 相同的错误处理逻辑
+        try:
+            # 第一次尝试使用 weights_only=True（更安全）
+            checkpoint = torch.load(model_path, map_location='cpu', weights_only=True)
+        except Exception as e:
+            # 如果失败，使用 weights_only=False（需要信任文件来源）
+            print(f"[ModelService] Warning: weights_only load failed for {model_name}, using full load: {e}")
+            checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
         
         # 判断模型类型并加载
         # 这里暂时返回checkpoint，具体加载逻辑在分割服务中实现
@@ -192,4 +204,9 @@ def get_model_service(checkpoint_folder: str) -> ModelService:
     global _model_service_instance
     if _model_service_instance is None:
         _model_service_instance = ModelService(checkpoint_folder)
+        print(f"[ModelService] Created new instance with checkpoint_folder: {checkpoint_folder}")
+    elif _model_service_instance.checkpoint_folder != checkpoint_folder:
+        # 如果checkpoint_folder发生变化，更新实例
+        print(f"[ModelService] Updating checkpoint_folder from {_model_service_instance.checkpoint_folder} to {checkpoint_folder}")
+        _model_service_instance.checkpoint_folder = checkpoint_folder
     return _model_service_instance

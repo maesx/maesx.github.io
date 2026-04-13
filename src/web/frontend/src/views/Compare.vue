@@ -57,41 +57,82 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { segmentApi } from '@/api/modules'
 
-const compareList = ref([
-  {
-    id: 1,
-    model: 'best_model.pth',
-    segmented_image: '/api/placeholder/300/200',
-    iou: 0.80,
-    timestamp: '2026-04-07 16:30:00'
-  },
-  {
-    id: 2,
-    model: 'epoch_10.pth',
-    segmented_image: '/api/placeholder/300/200',
-    iou: 0.78,
-    timestamp: '2026-04-07 16:31:00'
+const compareList = ref([])
+const loading = ref(false)
+
+// 计算差异对比表格数据
+const differenceTable = computed(() => {
+  if (compareList.value.length === 0) return []
+  
+  const metrics = ['IoU', '准确率', '处理时间']
+  return metrics.map(metric => {
+    const row = { metric }
+    compareList.value.forEach((item, index) => {
+      if (metric === 'IoU') {
+        row[`model${index}`] = `${(item.iou * 100).toFixed(2)}%`
+      } else if (metric === '准确率') {
+        row[`model${index}`] = item.accuracy ? `${(item.accuracy * 100).toFixed(2)}%` : 'N/A'
+      } else if (metric === '处理时间') {
+        row[`model${index}`] = item.process_time ? `${item.process_time.toFixed(2)}s` : 'N/A'
+      }
+    })
+    return row
+  })
+})
+
+// 从历史记录获取对比列表
+const fetchCompareList = async () => {
+  loading.value = true
+  try {
+    const response = await segmentApi.getCompareList()
+    if (response.success) {
+      compareList.value = response.compare_list || []
+    }
+  } catch (error) {
+    console.error('获取对比列表失败:', error)
+    // 如果API不存在，初始为空列表
+    compareList.value = []
+  } finally {
+    loading.value = false
   }
-])
-
-const differenceTable = ref([
-  { metric: 'IoU', model0: '80.00%', model1: '78.00%' },
-  { metric: '准确率', model0: '92.00%', model1: '90.00%' },
-  { metric: '处理时间', model0: '1.2s', model1: '1.3s' }
-])
-
-const removeFromCompare = (index) => {
-  compareList.value.splice(index, 1)
-  ElMessage.success('已移除')
 }
 
-const clearCompare = () => {
-  compareList.value = []
-  ElMessage.success('已清空对比列表')
+const removeFromCompare = async (index) => {
+  const item = compareList.value[index]
+  try {
+    // 调用后端API移除
+    await segmentApi.removeFromCompare(item.id)
+    compareList.value.splice(index, 1)
+    ElMessage.success('已移除')
+  } catch (error) {
+    console.error('移除失败:', error)
+    // 即使API失败，也从本地移除
+    compareList.value.splice(index, 1)
+    ElMessage.success('已移除')
+  }
 }
+
+const clearCompare = async () => {
+  try {
+    // 调用后端API清空
+    await segmentApi.clearCompare()
+    compareList.value = []
+    ElMessage.success('已清空对比列表')
+  } catch (error) {
+    console.error('清空失败:', error)
+    // 即使API失败，也清空本地列表
+    compareList.value = []
+    ElMessage.success('已清空对比列表')
+  }
+}
+
+onMounted(() => {
+  fetchCompareList()
+})
 </script>
 
 <style scoped>

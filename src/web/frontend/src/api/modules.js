@@ -58,6 +58,34 @@ export const segmentApi = {
    */
   getHistory() {
     return api.get('/segment/history')
+  },
+
+  /**
+   * 获取对比列表
+   */
+  getCompareList() {
+    return api.get('/segment/compare/list')
+  },
+
+  /**
+   * 从对比列表中移除
+   */
+  removeFromCompare(id) {
+    return api.delete(`/segment/compare/${id}`)
+  },
+
+  /**
+   * 清空对比列表
+   */
+  clearCompare() {
+    return api.delete('/segment/compare/clear')
+  },
+
+  /**
+   * 添加到对比列表
+   */
+  addToCompare(resultId) {
+    return api.post(`/segment/compare/add/${resultId}`)
   }
 }
 
@@ -94,8 +122,24 @@ export const augmentationApi = {
   /**
    * 生成预览
    */
-  generatePreview(formData) {
-    return api.post('/augmentation/preview', formData)
+  preview(formData, onProgress) {
+    return api.post('/augmentation/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress
+    })
+  },
+
+  /**
+   * 下载ZIP
+   */
+  downloadZip(results) {
+    const formData = new FormData()
+    formData.append('results', JSON.stringify(results))
+    
+    return api.post('/augmentation/download', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      responseType: 'blob'
+    })
   }
 }
 

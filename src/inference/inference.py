@@ -48,7 +48,7 @@ class VehicleSegmenter:
 
         try:
             self.logger.info(f"加载模型: {model_path}")
-            checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+            checkpoint = torch.load(model_path, map_location=self.device, weights_only=True)
             args = checkpoint.get('args', None)
 
             # 处理无 args 的旧版 checkpoint

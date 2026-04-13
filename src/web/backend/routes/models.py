@@ -157,7 +157,7 @@ class ModelUploadResource(Resource):
             # 验证模型文件
             try:
                 import torch
-                torch.load(save_path, map_location='cpu', weights_only=False)
+                torch.load(save_path, map_location='cpu', weights_only=True)
             except Exception as e:
                 # 删除无效文件
                 os.remove(save_path)

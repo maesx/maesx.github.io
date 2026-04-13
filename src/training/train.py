@@ -1,6 +1,8 @@
 """
 训练脚本
 支持CPU和GPU训练
+
+python3 src/training/train.py --use_gpu True --subset_ratio 1.0 --epochs 30 --batch_size 8 --save_interval 5 --early_stopping_patience 10 --num_workers 0 --resume outputs/checkpoints/best_model.pth
 """
 import argparse
 import logging
@@ -94,8 +96,14 @@ class Trainer:
         )
         self.model = self.model.to(self.device)
 
-        # 创建损失函数
-        base_loss = CombinedLoss(weight_ce=1.0, weight_dice=1.0)
+        # 创建损失函数，添加类别权重
+        # 类别权重：根据数据集分布计算
+        # Background: 98.35%, Road: 84.85%, Vehicle: 8.33%, Pedestrian: 37.64%
+        # 权重计算: 1 / sqrt(frequency)，并对车辆类别额外加权
+        class_weights = torch.tensor([0.0165, 0.1515, 12.0, 2.6596], dtype=torch.float32)
+        self.logger.info(f"类别权重: Background={class_weights[0]:.4f}, Road={class_weights[1]:.4f}, Vehicle={class_weights[2]:.4f}, Pedestrian={class_weights[3]:.4f}")
+        
+        base_loss = CombinedLoss(weight_ce=1.0, weight_dice=1.0, class_weights=class_weights)
         if args.deep_supervision:
             self.criterion: nn.Module = DeepSupervisionLoss(base_loss)
         else:
@@ -421,9 +429,6 @@ class Trainer:
 
             # 验证
             val_loss, val_iou, val_acc = self.validate(epoch)
-
-            # 智能学习率调整:当IoU下降时调整学习率
-            self._adjust_learning_rate_on_iou_drop(val_iou)
 
             # 学习率调整
             self.scheduler.step(val_iou)
