@@ -16,10 +16,10 @@ import numpy as np
 from PIL import Image
 
 from src.web.backend.services.augmentation_service import get_augmentation_service
-from backend.database.session import get_db_session
-from backend.database.models.augmentation import AugmentationRecord
-from backend.database.models.augmentation_result import AugmentationResult
-from backend.config.database import db_config
+from src.web.backend.database.session import get_db_session
+from src.web.backend.database.models.augmentation import AugmentationRecord
+from src.web.backend.database.models.augmentation_result import AugmentationResult
+from src.web.backend.config.database import db_config
 
 
 def image_to_base64(image_array):

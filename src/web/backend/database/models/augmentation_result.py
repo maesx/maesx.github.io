@@ -7,7 +7,7 @@ from sqlalchemy import Column, BigInteger, String, Integer, SmallInteger, DateTi
 from sqlalchemy.dialects.mysql import LONGTEXT as LongText
 from sqlalchemy.orm import relationship
 
-from backend.database.session import Base
+from src.web.backend.database.session import Base
 
 
 class AugmentationResult(Base):

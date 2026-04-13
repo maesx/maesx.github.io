@@ -5,8 +5,9 @@
 from datetime import datetime
 from sqlalchemy import Column, BigInteger, String, Text, Integer, Float, SmallInteger, DateTime, Enum, JSON, ForeignKey
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.mysql import LONGTEXT as LongText
 
-from backend.database.session import Base
+from src.web.backend.database.session import Base
 
 
 class SegmentationRecord(Base):
@@ -83,7 +84,3 @@ class SegmentationRecord(Base):
             'error_message': self.error_message,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-
-
-# 导入LongText类型
-from sqlalchemy.dialects.mysql import LONGTEXT as LongText

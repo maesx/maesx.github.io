@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy import Column, BigInteger, String, Text, SmallInteger, DateTime, Enum
 from sqlalchemy.orm import relationship
 
-from backend.database.session import Base
+from src.web.backend.database.session import Base
 
 
 class User(Base):

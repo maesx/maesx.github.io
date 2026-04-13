@@ -11,9 +11,9 @@ from datetime import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
 import logging
-from backend.database.session import get_db, get_db_session
-from backend.database.models import User, Model, SegmentationRecord, AugmentationRecord, OperationLog
-from backend.config.database import db_config
+from src.web.backend.database.session import get_db, get_db_session
+from src.web.backend.database.models import User, Model, SegmentationRecord, AugmentationRecord, OperationLog
+from src.web.backend.config.database import db_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

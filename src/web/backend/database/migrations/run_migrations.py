@@ -11,8 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
 from sqlalchemy import text
-from backend.database.session import get_engine, init_database
-from backend.config.database import db_config
+from src.web.backend.database.session import get_engine, init_database
+from src.web.backend.config.database import db_config
 
 logger = logging.getLogger(__name__)
 

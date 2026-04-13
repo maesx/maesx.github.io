@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.pool import QueuePool
 import logging
 
-from backend.config.database import db_config
+from src.web.backend.config.database import db_config
 
 logger = logging.getLogger(__name__)
 

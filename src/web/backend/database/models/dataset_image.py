@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy import Column, BigInteger, String, Integer, SmallInteger, DateTime, Enum, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 
-from backend.database.session import Base
+from src.web.backend.database.session import Base
 
 
 class DatasetImage(Base):

@@ -13,7 +13,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_restful import Api
 
-from src.web.backend.config import Config
+from src.web.backend.app_config import Config
 
 
 def create_app(config_class=Config):

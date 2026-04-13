@@ -9,9 +9,9 @@ import logging
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
-from backend.database.session import init_database, create_tables, get_db
-from backend.database.models import User, Model
-from backend.config.database import db_config
+from src.web.backend.database.session import init_database, create_tables, get_db
+from src.web.backend.database.models import User, Model
+from src.web.backend.config.database import db_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
