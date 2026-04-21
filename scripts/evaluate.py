@@ -1,8 +1,9 @@
 """
 模型评估脚本
-在测试集上计算IoU和准确率
+在测试集上计算IoU、准确率、Precision、Recall、F1-Score
 """
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -17,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.data.dataset import RoadVehicleDataset, get_validation_augmentation
 from src.models.unet_plusplus import UNetPlusPlus
-from src.utils.losses import calculate_iou, calculate_pixel_accuracy
+from src.utils.losses import calculate_iou, calculate_pixel_accuracy, calculate_precision_recall
 
 
 def evaluate_model(
@@ -101,9 +102,18 @@ def evaluate_model(
     
     # 评估
     print(f"\n开始评估...")
+    
+    # 初始化指标累积器
     total_iou = 0.0
     total_acc = 0.0
+    total_precision = 0.0
+    total_recall = 0.0
+    total_f1 = 0.0
+    
     class_ious = {i: [] for i in range(num_classes)}
+    class_precisions = {i: [] for i in range(num_classes)}
+    class_recalls = {i: [] for i in range(num_classes)}
+    class_f1s = {i: [] for i in range(num_classes)}
     
     with torch.no_grad():
         for images, masks in tqdm(dataloader, desc="评估中"):
@@ -117,37 +127,61 @@ def evaluate_model(
             
             preds = torch.argmax(outputs, dim=1)
             
-            # 计算指标
+            # 计算IoU
             batch_iou, mean_iou = calculate_iou(preds, masks, num_classes)
             acc = calculate_pixel_accuracy(preds, masks)
             
+            # 计算Precision, Recall, F1
+            precision, recall, f1 = calculate_precision_recall(preds, masks, num_classes)
+            
+            # 累积指标
             total_iou += mean_iou.item()
             total_acc += acc
+            total_precision += precision[1:].mean().item()  # 排除背景
+            total_recall += recall[1:].mean().item()
+            total_f1 += f1[1:].mean().item()
             
-            # 记录每个类别的IoU
+            # 记录每个类别的指标
             for cls_id in range(num_classes):
                 cls_iou = batch_iou[cls_id].item()
+                cls_precision = precision[cls_id].item()
+                cls_recall = recall[cls_id].item()
+                cls_f1 = f1[cls_id].item()
+                
                 if cls_iou > 0:  # 忽略不存在的类别
                     class_ious[cls_id].append(cls_iou)
+                    class_precisions[cls_id].append(cls_precision)
+                    class_recalls[cls_id].append(cls_recall)
+                    class_f1s[cls_id].append(cls_f1)
     
     # 计算平均指标
     num_batches = len(dataloader)
     avg_iou = total_iou / num_batches
     avg_acc = total_acc / num_batches
+    avg_precision = total_precision / num_batches
+    avg_recall = total_recall / num_batches
+    avg_f1 = total_f1 / num_batches
     
-    # 计算每个类别的平均IoU
-    class_mean_ious = {}
+    # 计算每个类别的平均指标
     class_names = ['background', 'car', 'truck', 'bus']
+    
+    class_metrics = {}
     for cls_id in range(num_classes):
-        if class_ious[cls_id]:
-            class_mean_ious[class_names[cls_id]] = np.mean(class_ious[cls_id])
-        else:
-            class_mean_ious[class_names[cls_id]] = 0.0
+        class_name = class_names[cls_id]
+        class_metrics[class_name] = {
+            'iou': np.mean(class_ious[cls_id]) if class_ious[cls_id] else 0.0,
+            'precision': np.mean(class_precisions[cls_id]) if class_precisions[cls_id] else 0.0,
+            'recall': np.mean(class_recalls[cls_id]) if class_recalls[cls_id] else 0.0,
+            'f1': np.mean(class_f1s[cls_id]) if class_f1s[cls_id] else 0.0
+        }
     
     results = {
         'mean_iou': avg_iou,
         'pixel_accuracy': avg_acc,
-        'class_ious': class_mean_ious,
+        'mean_precision': avg_precision,
+        'mean_recall': avg_recall,
+        'mean_f1': avg_f1,
+        'class_metrics': class_metrics,
         'num_samples': len(dataset)
     }
     
@@ -171,6 +205,8 @@ def main():
                         help='类别数')
     parser.add_argument('--device', type=str, default='cpu',
                         help='评估设备')
+    parser.add_argument('--output', type=str, default='',
+                        help='结果输出JSON文件路径')
     
     args = parser.parse_args()
     
@@ -201,15 +237,29 @@ def main():
     print("="*60)
     print(f"数据集: {args.split}")
     print(f"样本数: {results['num_samples']}")
-    print(f"\n整体性能:")
-    print(f"  - 平均IoU (mIoU): {results['mean_iou']:.4f} ({results['mean_iou']*100:.2f}%)")
-    print(f"  - 像素准确率: {results['pixel_accuracy']:.4f} ({results['pixel_accuracy']*100:.2f}%)")
     
-    print(f"\n各类别IoU:")
-    for class_name, iou in results['class_ious'].items():
-        print(f"  - {class_name:12s}: {iou:.4f} ({iou*100:.2f}%)")
+    print(f"\n整体性能 (排除背景):")
+    print(f"  - mIoU:          {results['mean_iou']:.4f} ({results['mean_iou']*100:.2f}%)")
+    print(f"  - Pixel Acc:     {results['pixel_accuracy']:.4f} ({results['pixel_accuracy']*100:.2f}%)")
+    print(f"  - Precision:     {results['mean_precision']:.4f} ({results['mean_precision']*100:.2f}%)")
+    print(f"  - Recall:        {results['mean_recall']:.4f} ({results['mean_recall']*100:.2f}%)")
+    print(f"  - F1-Score:      {results['mean_f1']:.4f} ({results['mean_f1']*100:.2f}%)")
+    
+    print(f"\n各类别指标:")
+    print(f"{'类别':<12} {'IoU':>8} {'Precision':>10} {'Recall':>8} {'F1-Score':>10}")
+    print("-" * 52)
+    for class_name, metrics in results['class_metrics'].items():
+        print(f"{class_name:<12} {metrics['iou']:>8.4f} {metrics['precision']:>10.4f} {metrics['recall']:>8.4f} {metrics['f1']:>10.4f}")
     
     print("\n" + "="*60)
+    
+    # 保存结果到JSON文件
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        print(f"结果已保存到: {output_path}")
 
 
 if __name__ == '__main__':

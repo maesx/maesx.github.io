@@ -46,7 +46,7 @@ class DiceLoss(nn.Module):
 
 
 class CombinedLoss(nn.Module):
-    """组合损失: CrossEntropy + Dice
+    """组合损失: CrossEntropy + Dice + Focal Loss
     
     注意: 在MPS设备上，CrossEntropyLoss有已知的bus error问题，
     因此需要在CPU上计算后再移回原设备
@@ -56,17 +56,20 @@ class CombinedLoss(nn.Module):
         self, 
         weight_ce: float = 1.0, 
         weight_dice: float = 1.0,
+        weight_focal: float = 0.0,
         class_weights: Optional[torch.Tensor] = None
     ) -> None:
         """
         Args:
             weight_ce: CrossEntropy 损失权重
             weight_dice: Dice 损失权重
+            weight_focal: Focal Loss 权重 (0表示不使用)
             class_weights: 类别权重 [C]
         """
         super(CombinedLoss, self).__init__()
         self.weight_ce = weight_ce
         self.weight_dice = weight_dice
+        self.weight_focal = weight_focal
         if class_weights is not None:
             self.register_buffer('class_weights', class_weights)
         else:
@@ -197,6 +200,106 @@ def calculate_pixel_accuracy(pred: torch.Tensor, target: torch.Tensor) -> float:
     total = target.numel()
     
     return correct / total
+
+
+def calculate_precision_recall(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    num_classes: int,
+    smooth: float = 1e-6
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    计算每个类别的Precision, Recall和F1-Score
+    
+    Args:
+        pred: 预测结果 [B, H, W]
+        target: 真实标签 [B, H, W]
+        num_classes: 类别数
+        smooth: 平滑项
+        
+    Returns:
+        precision_per_class: 每个类别的Precision
+        recall_per_class: 每个类别的Recall
+        f1_per_class: 每个类别的F1-Score
+    """
+    # 确保是long类型
+    pred = pred.long()
+    target = target.long()
+    
+    # 转为one-hot编码
+    pred_one_hot = F.one_hot(pred, num_classes=num_classes)
+    target_one_hot = F.one_hot(target, num_classes=num_classes)
+    
+    # 转换维度 [B, H, W, C] -> [B, C, H, W]
+    pred_one_hot = pred_one_hot.permute(0, 3, 1, 2).float()
+    target_one_hot = target_one_hot.permute(0, 3, 1, 2).float()
+    
+    # 计算TP, FP, FN
+    # TP: 预测为正类且真实为正类
+    # FP: 预测为正类但真实为负类
+    # FN: 预测为负类但真实为正类
+    tp = torch.sum(pred_one_hot * target_one_hot, dim=(2, 3))  # [B, C]
+    fp = torch.sum(pred_one_hot * (1 - target_one_hot), dim=(2, 3))
+    fn = torch.sum((1 - pred_one_hot) * target_one_hot, dim=(2, 3))
+    
+    # 计算Precision和Recall
+    precision_per_class = (tp + smooth) / (tp + fp + smooth)  # [B, C]
+    recall_per_class = (tp + smooth) / (tp + fn + smooth)     # [B, C]
+    
+    # 计算F1-Score
+    f1_per_class = 2 * precision_per_class * recall_per_class / (precision_per_class + recall_per_class + smooth)
+    
+    # 取平均
+    precision_mean = precision_per_class.mean(dim=0)  # [C]
+    recall_mean = recall_per_class.mean(dim=0)        # [C]
+    f1_mean = f1_per_class.mean(dim=0)                # [C]
+    
+    return precision_mean, recall_mean, f1_mean
+
+
+def calculate_metrics(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    num_classes: int,
+    smooth: float = 1e-6
+) -> dict:
+    """
+    计算所有评估指标
+    
+    Args:
+        pred: 预测结果 [B, H, W]
+        target: 真实标签 [B, H, W]
+        num_classes: 类别数
+        smooth: 平滑项
+        
+    Returns:
+        包含所有指标的字典
+    """
+    # 计算IoU
+    iou_per_class, mean_iou = calculate_iou(pred, target, num_classes, smooth)
+    
+    # 计算Precision, Recall, F1
+    precision, recall, f1 = calculate_precision_recall(pred, target, num_classes, smooth)
+    
+    # 计算像素准确率
+    pixel_acc = calculate_pixel_accuracy(pred, target)
+    
+    # 排除背景的平均值
+    mean_precision = precision[1:].mean()
+    mean_recall = recall[1:].mean()
+    mean_f1 = f1[1:].mean()
+    
+    return {
+        'iou_per_class': iou_per_class,
+        'mean_iou': mean_iou,
+        'precision_per_class': precision,
+        'recall_per_class': recall,
+        'f1_per_class': f1,
+        'mean_precision': mean_precision,
+        'mean_recall': mean_recall,
+        'mean_f1': mean_f1,
+        'pixel_accuracy': pixel_acc
+    }
 
 
 if __name__ == '__main__':
