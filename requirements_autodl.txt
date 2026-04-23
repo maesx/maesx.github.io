@@ -1,0 +1,45 @@
+# AutoDL训练专用依赖
+# 适用于 PyTorch 2.1.2 + Python 3.8 环境 (AutoDL最新镜像)
+
+# ==================== 核心框架 ====================
+# AutoDL镜像已预装:
+# PyTorch 2.1.2 (支持ResNet-101, FPN, 注意力机制)
+# TorchVision 0.16.0 (支持新API: ResNet101_Weights)
+# CUDA 11.8 或 12.1
+
+# ==================== 必需依赖 ====================
+# 数据增强
+albumentations==1.3.0
+opencv-python==4.8.0.76
+
+# 可视化
+matplotlib==3.7.1
+tensorboard==2.13.0
+
+# 数据处理
+numpy==1.24.3
+Pillow==9.5.0
+
+# 进度条
+tqdm==4.65.0
+
+# ==================== 可选依赖 ====================
+# 如果需要Web服务 (本地推理)
+Flask==2.3.2
+Flask-CORS==4.0.0
+
+# 如果需要数据库支持 (模型管理)
+pymysql==1.1.0
+sqlalchemy==2.0.15
+
+# ==================== 安装说明 ====================
+# AutoDL镜像已包含: torch 2.1.2, torchvision 0.16.0, numpy, pillow, tqdm
+# 只需安装:
+# pip install albumentations opencv-python matplotlib tensorboard
+
+# ==================== 版本兼容性 ====================
+# PyTorch 2.1.2 完全兼容项目代码:
+# ✅ ResNet101_Weights.IMAGENET1K_V1 (新API)
+# ✅ torch.compile() 模型优化
+# ✅ F.scaled_dot_product_attention 高效注意力
+# ✅ CUDA 11.8/12.1 GPU加速
