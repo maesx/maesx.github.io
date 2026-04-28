@@ -1,0 +1,27 @@
+{
+  "parameters": {
+    "total_params": 78853545,
+    "trainable_params": 78853545,
+    "params_mb": 300.8024024963379
+  },
+  "model_size": {
+    "file_size_mb": 301.54876041412354
+  },
+  "inference_speed": {
+    "avg_time_ms": 95.62731520000008,
+    "fps": 10.457263156542108,
+    "min_time_ms": 94.20783399999965,
+    "max_time_ms": 98.52083300000025
+  },
+  "memory": {
+    "cpu_memory_mb": 491.796875
+  },
+  "yolov8_seg_theoretical": {
+    "total_params": 25900000,
+    "params_mb": 103.6,
+    "file_size_mb": 104.0,
+    "avg_time_ms": 8.5,
+    "fps": 118,
+    "gpu_memory_mb": 4500
+  }
+}

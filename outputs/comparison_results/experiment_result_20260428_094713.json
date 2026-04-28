@@ -1,0 +1,39 @@
+{
+  "experiment_time": "2026-04-28T09:47:13.280034",
+  "device": {
+    "type": "mps",
+    "name": "Apple Silicon"
+  },
+  "unet_pp_ultimate": {
+    "architecture": "ResNet-101 + FPN + CBAM + ASPP + 边界优化",
+    "parameters": {
+      "total": 78853545,
+      "trainable": 78853545,
+      "size_mb": 300.8
+    },
+    "model_file_mb": 355.89,
+    "inference": {
+      "avg_time_ms": 96.83,
+      "std_time_ms": 0.96,
+      "min_time_ms": 95.65,
+      "max_time_ms": 101.52,
+      "fps": 10.33
+    },
+    "memory": {
+      "cpu_mb": 0.05,
+      "test_input": "1x3x512x512"
+    }
+  },
+  "yolov8_seg_reference": {
+    "platform": "NVIDIA T4 GPU",
+    "parameters": {
+      "total_params": 25900000,
+      "params_size_mb": 103.6,
+      "file_size_mb": 104.0,
+      "avg_time_ms": 8.5,
+      "fps": 118,
+      "gpu_memory_mb": 4500
+    },
+    "source": "官方基准测试"
+  }
+}
