@@ -342,7 +342,21 @@ class ModelUploadResource(Resource):
             model_service = get_model_service(current_app.config['CHECKPOINT_FOLDER'])
             model_info = model_service._get_model_info(save_path)
 
+            # JSON序列化处理
             if model_info:
+                # 移除不可序列化的字段
+                serializable_info = {
+                    'name': model_info.get('name'),
+                    'size': model_info.get('size'),
+                    'size_mb': model_info.get('size_mb'),
+                    'created_at': model_info.get('created_at'),
+                    'type': model_info.get('type'),
+                    'architecture': model_info.get('architecture'),
+                    'iou': model_info.get('iou', 0.0),
+                    'epoch': model_info.get('epoch'),
+                    'use_fpn': model_info.get('use_fpn', False)
+                }
+                
                 # 保存到数据库
                 model_id = _save_model_to_db(model_info, user_id=None)
 
@@ -360,12 +374,14 @@ class ModelUploadResource(Resource):
                     ip_address=request.remote_addr,
                     user_agent=request.headers.get('User-Agent', '')[:255]
                 )
+            else:
+                serializable_info = None
 
             return jsonify({
                 'success': True,
                 'message': '模型上传成功',
                 'model_name': model_name,
-                'model_info': model_info,
+                'model_info': serializable_info,
                 'path': save_path
             })
 
