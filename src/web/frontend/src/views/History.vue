@@ -46,6 +46,54 @@
         </el-table-column>
       </el-table>
     </el-card>
+    
+    <!-- 详情弹窗 -->
+    <el-dialog
+      v-model="detailDialogVisible"
+      title="分割详情"
+      width="90%"
+      :close-on-click-modal="false"
+    >
+      <div v-if="currentDetail" class="detail-content">
+        <!-- 基本信息 -->
+        <el-descriptions :column="3" border class="detail-info">
+          <el-descriptions-item label="记录ID">{{ currentDetail.display_id }}</el-descriptions-item>
+          <el-descriptions-item label="使用模型">{{ currentDetail.model }}</el-descriptions-item>
+          <el-descriptions-item label="分割类型">
+            <el-tag>{{ currentDetail.segment_type === 'semantic' ? '语义分割' : '实例分割' }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="IoU得分">
+            <el-tag :type="getIOUTagType(currentDetail.iou)">
+              {{ (currentDetail.iou * 100).toFixed(2) }}%
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="准确率">{{ (currentDetail.accuracy * 100).toFixed(2) }}%</el-descriptions-item>
+          <el-descriptions-item label="处理耗时">{{ currentDetail.process_time.toFixed(2) }}s</el-descriptions-item>
+          <el-descriptions-item label="创建时间" :span="3">{{ currentDetail.timestamp }}</el-descriptions-item>
+        </el-descriptions>
+        
+        <!-- 图像展示 -->
+        <div class="image-grid">
+          <div class="image-item">
+            <h4>原图</h4>
+            <img :src="currentDetail.thumbnail" alt="原图" class="detail-image" />
+          </div>
+          <div class="image-item">
+            <h4>分割结果</h4>
+            <img :src="currentDetail.segmented_image" alt="分割结果" class="detail-image" />
+          </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="detail-actions">
+          <el-button type="primary" @click="downloadImage(currentDetail.segmented_image, 'segmented.png')">
+            <el-icon><Download /></el-icon>
+            下载分割结果
+          </el-button>
+          <el-button @click="detailDialogVisible = false">关闭</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -56,6 +104,8 @@ import { segmentApi } from '@/api/modules'
 
 const historyList = ref([])
 const loading = ref(false)
+const detailDialogVisible = ref(false)
+const currentDetail = ref(null)
 
 const getIOUTagType = (iou) => {
   if (iou >= 0.8) return 'success'
@@ -87,8 +137,8 @@ const refreshHistory = () => {
 }
 
 const viewDetail = (row) => {
-  // TODO: 实现查看详情弹窗
-  ElMessage.info(`查看详情: ${row.display_id}`)
+  currentDetail.value = row
+  detailDialogVisible.value = true
 }
 
 const addToCompare = async (row) => {
@@ -126,6 +176,22 @@ const deleteRecord = async (row) => {
   }
 }
 
+const downloadImage = (base64Data, filename) => {
+  try {
+    // 创建下载链接
+    const link = document.createElement('a')
+    link.href = base64Data
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    ElMessage.success('下载成功')
+  } catch (error) {
+    console.error('下载失败:', error)
+    ElMessage.error('下载失败')
+  }
+}
+
 onMounted(() => {
   fetchHistory()
 })
@@ -154,5 +220,44 @@ onMounted(() => {
   margin-top: 16px;
   color: #909399;
   font-size: 14px;
+}
+
+.detail-content {
+  padding: 20px;
+}
+
+.detail-info {
+  margin-bottom: 24px;
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.image-item {
+  text-align: center;
+}
+
+.image-item h4 {
+  margin-bottom: 12px;
+  color: #303133;
+  font-size: 14px;
+}
+
+.detail-image {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.detail-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
 }
 </style>

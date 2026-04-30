@@ -737,8 +737,8 @@ class SegmentHistoryResource(Resource):
                             'model': record.model.name if record.model else 'unknown',
                             'segment_type': record.segment_type,
                             'original_filename': f"image_{record.id}",  # 可从original_image字段提取
-                            'thumbnail': record.original_image[:100] + '...' if record.original_image and len(record.original_image) > 100 else record.original_image,
-                            'segmented_image': record.result_image[:100] + '...' if record.result_image and len(record.result_image) > 100 else record.result_image,
+                            'thumbnail': record.original_image,  # 返回完整图像数据
+                            'segmented_image': record.result_image,  # 返回完整图像数据
                             'iou': record.iou_score or 0.0,
                             'accuracy': record.accuracy or 0.0,
                             'process_time': record.processing_time or 0.0,
