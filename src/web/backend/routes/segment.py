@@ -695,10 +695,7 @@ class BatchSegmentResource(Resource):
 class SegmentHistoryResource(Resource):
     """分割历史记录资源"""
     
-    # 简单的内存存储（实际生产环境应使用数据库）
-    history_records = []
-    max_records = 10
-    # 自增ID计数器
+    # 自增ID计数器（用于前端展示）
     _id_counter = 0
     # ID前缀
     ID_PREFIX = 'SEG'
@@ -716,10 +713,64 @@ class SegmentHistoryResource(Resource):
         Returns:
             历史记录列表
         """
-        return {
-            'success': True,
-            'history': self.history_records
-        }
+        try:
+            # 尝试从数据库获取历史记录
+            from src.web.backend.database.session import get_db_session
+            from src.web.backend.database.models.segmentation import SegmentationRecord
+            
+            with get_db_session() as session:
+                if session is not None:
+                    # 从数据库获取最近50条记录
+                    records = session.query(SegmentationRecord)\
+                        .order_by(SegmentationRecord.created_at.desc())\
+                        .limit(50)\
+                        .all()
+                    
+                    history = []
+                    for record in records:
+                        # 生成展示ID（基于数据库ID）
+                        display_id = f"{self.ID_PREFIX}-{record.id:04d}"
+                        
+                        history.append({
+                            'id': str(record.id),  # 数据库ID
+                            'display_id': display_id,
+                            'model': record.model.name if record.model else 'unknown',
+                            'segment_type': record.segment_type,
+                            'original_filename': f"image_{record.id}",  # 可从original_image字段提取
+                            'thumbnail': record.original_image[:100] + '...' if record.original_image and len(record.original_image) > 100 else record.original_image,
+                            'segmented_image': record.result_image[:100] + '...' if record.result_image and len(record.result_image) > 100 else record.result_image,
+                            'iou': record.iou_score or 0.0,
+                            'accuracy': record.accuracy or 0.0,
+                            'process_time': record.processing_time or 0.0,
+                            'timestamp': record.created_at.strftime('%Y-%m-%d %H:%M:%S') if record.created_at else ''
+                        })
+                    
+                    return {
+                        'success': True,
+                        'history': history,
+                        'source': 'database'
+                    }
+                else:
+                    # 数据库未启用，使用内存存储
+                    return {
+                        'success': True,
+                        'history': self._get_memory_records(),
+                        'source': 'memory'
+                    }
+        except Exception as e:
+            print(f"[WARNING] 从数据库获取历史记录失败: {str(e)}，使用内存存储")
+            return {
+                'success': True,
+                'history': self._get_memory_records(),
+                'source': 'memory'
+            }
+    
+    def _get_memory_records(self):
+        """获取内存中的历史记录"""
+        # 简单的内存存储作为后备方案
+        if not hasattr(self, '_memory_records'):
+            self._memory_records = []
+        return self._memory_records
     
     @classmethod
     def add_record(cls, record):
@@ -729,24 +780,62 @@ class SegmentHistoryResource(Resource):
         Args:
             record: 分割结果记录
         """
+        try:
+            # 尝试保存到数据库
+            from src.web.backend.database.session import get_db_session
+            from src.web.backend.database.models.segmentation import SegmentationRecord
+            from PIL import Image
+            import io
+            
+            with get_db_session() as session:
+                if session is not None:
+                    # 解析base64图像数据
+                    original_image_data = record.get('thumbnail', '')
+                    result_image_data = record.get('segmented_image', '')
+                    
+                    # 创建数据库记录
+                    db_record = SegmentationRecord(
+                        user_id=None,  # 暂时未实现用户系统
+                        model_id=None,  # 暂时未关联模型表
+                        original_image=original_image_data,
+                        result_image=result_image_data,
+                        segment_type=record.get('segment_type', 'semantic'),
+                        processing_time=record.get('process_time', 0.0),
+                        iou_score=record.get('iou', 0.0),
+                        accuracy=record.get('accuracy', 0.0),
+                        status=1  # 成功状态
+                    )
+                    
+                    session.add(db_record)
+                    session.commit()
+                    
+                    print(f"[INFO] 分割记录已保存到数据库: ID={db_record.id}")
+                    return
+        except Exception as e:
+            print(f"[WARNING] 保存到数据库失败: {str(e)}，使用内存存储")
+        
+        # 数据库未启用或保存失败，使用内存存储
+        if not hasattr(cls, '_memory_records'):
+            cls._memory_records = []
+        
         # 生成自增展示ID
         display_id = cls._generate_display_id()
         
-        # 保存原始ID用于内部关联（如对比列表）
+        # 保存原始ID用于内部关联
         original_id = record.get('id')
         
-        # 创建新的记录，包含展示ID和原始ID
+        # 创建新的记录
         record_with_display_id = {
             **record,
-            'display_id': display_id,  # 用于前端展示
-            'id': original_id,  # 保留原始UUID用于内部关联
+            'display_id': display_id,
+            'id': original_id,
         }
         
-        cls.history_records.insert(0, record_with_display_id)
+        cls._memory_records.insert(0, record_with_display_id)
         
-        # 只保留最近10条记录
-        if len(cls.history_records) > cls.max_records:
-            cls.history_records = cls.history_records[:cls.max_records]
+        # 只保留最近50条记录
+        if len(cls._memory_records) > 50:
+            cls._memory_records = cls._memory_records[:50]
 
 
 class CompareListResource(Resource):
