@@ -9,7 +9,7 @@ import os
 import io
 from typing import Dict, List, Optional
 from datetime import datetime
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import json
 
 
@@ -23,10 +23,10 @@ class SegmentationResult:
     iou: float
     accuracy: float
     process_time: float
-    class_names: List[str]
-    class_iou: List[float]
-    pixel_distribution: List[float]
-    timestamp: str
+    class_names: List[str] = field(default_factory=list)
+    class_iou: List[float] = field(default_factory=list)
+    pixel_distribution: List[float] = field(default_factory=list)
+    timestamp: str = field(default_factory=lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     # 图片数据（base64编码）
     original_image: Optional[str] = None
     segmented_image: Optional[str] = None

@@ -18,10 +18,14 @@ tqdm>=4.65.0
 # Web框架
 Flask>=2.3.0
 Flask-CORS>=4.0.0
+Flask-RESTful>=0.3.10
 
 # 数据库支持
 pymysql>=1.1.0
 sqlalchemy>=2.0.0
+
+# JWT认证
+PyJWT>=2.8.0
 
 # 可选:GPU支持
 # torch>=2.0.0+cu118  # CUDA 11.8版本

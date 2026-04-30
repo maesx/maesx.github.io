@@ -1,0 +1,457 @@
+#!/usr/bin/env python3
+"""
+使用draw.io MCP绘制用例图
+"""
+import subprocess
+import json
+import time
+import sys
+
+class DrawIOMCPClient:
+    def __init__(self):
+        self.process = None
+        self.session_id = None
+        
+    def start(self):
+        """启动MCP服务器"""
+        self.process = subprocess.Popen(
+            ['npx', '@next-ai-drawio/mcp-server@latest'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
+        print("[INFO] MCP服务器已启动")
+        
+    def call_tool(self, tool_name, arguments=None):
+        """调用MCP工具"""
+        if arguments is None:
+            arguments = {}
+            
+        request = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": tool_name,
+                "arguments": arguments
+            }
+        }
+        
+        self.process.stdin.write(json.dumps(request) + '\n')
+        self.process.stdin.flush()
+        
+        # 读取响应
+        response_line = self.process.stdout.readline()
+        
+        # 跳过日志行
+        while '[MCP-DrawIO]' in response_line or '[INFO]' in response_line:
+            response_line = self.process.stdout.readline()
+            
+        try:
+            return json.loads(response_line)
+        except json.JSONDecodeError:
+            return None
+            
+    def start_session(self):
+        """启动绘图会话"""
+        result = self.call_tool('start_session')
+        if result and 'result' in result:
+            content = result['result']['content'][0]['text']
+            print(content)
+            # 提取session ID
+            if 'Session ID:' in content:
+                self.session_id = content.split('Session ID:')[1].split('\n')[0].strip()
+            return True
+        return False
+        
+    def create_diagram(self, xml):
+        """创建新图表"""
+        result = self.call_tool('create_new_diagram', {'xml': xml})
+        if result:
+            print("[INFO] 图表创建成功")
+            return True
+        return False
+        
+    def export_diagram(self, path, format='drawio'):
+        """导出图表"""
+        result = self.call_tool('export_diagram', {'path': path, 'format': format})
+        if result:
+            print(f"[INFO] 图表已导出到: {path}")
+            return True
+        return False
+        
+    def close(self):
+        """关闭MCP服务器"""
+        if self.process:
+            self.process.terminate()
+            self.process.wait()
+            print("[INFO] MCP服务器已关闭")
+
+
+def create_usecase_diagram_xml():
+    """创建用例图的XML"""
+    return '''<mxGraphModel dx="1434" dy="780" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    
+    <!-- 标题 -->
+    <mxCell id="title" value="道路车辆分割系统 - 用例图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=24;fontColor=#333333;" vertex="1" parent="1">
+      <mxGeometry x="500" y="20" width="600" height="40" as="geometry" />
+    </mxCell>
+    
+    <!-- 参与者 - Web用户 -->
+    <mxCell id="actor-user" value="Web用户" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="80" y="300" width="50" height="100" as="geometry" />
+    </mxCell>
+    
+    <!-- 参与者 - 算法工程师 -->
+    <mxCell id="actor-engineer" value="算法工程师" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="80" y="700" width="50" height="100" as="geometry" />
+    </mxCell>
+    
+    <!-- 参与者 - 系统管理员 -->
+    <mxCell id="actor-admin" value="系统管理员" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1420" y="300" width="50" height="100" as="geometry" />
+    </mxCell>
+    
+    <!-- 参与者 - GPU资源 -->
+    <mxCell id="actor-gpu" value="GPU资源" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1420" y="700" width="50" height="100" as="geometry" />
+    </mxCell>
+    
+    <!-- 系统边界 -->
+    <mxCell id="system-boundary" value="道路车辆分割系统" style="shape=umlFrame;whiteSpace=wrap;html=1;width=200;height=40;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=16;" vertex="1" parent="1">
+      <mxGeometry x="200" y="70" width="1150" height="800" as="geometry" />
+    </mxCell>
+    
+    <!-- Web平台用例组 -->
+    <mxCell id="web-group" value="Web平台" style="swimlane;horizontal=0;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+      <mxGeometry x="230" y="130" width="520" height="350" as="geometry" />
+    </mxCell>
+    
+    <!-- 图像分割 -->
+    <mxCell id="uc-segment" value="图像分割" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="260" y="180" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-batch-segment" value="批量分割" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="420" y="180" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-view-result" value="查看结果" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="580" y="180" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <!-- 模型管理 -->
+    <mxCell id="uc-model-list" value="查看模型列表" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="260" y="270" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-model-upload" value="上传模型" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="420" y="270" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-model-delete" value="删除模型" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="580" y="270" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <!-- 历史记录 -->
+    <mxCell id="uc-history" value="历史记录" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="260" y="360" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-compare" value="结果对比" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="420" y="360" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <!-- 数据增强 -->
+    <mxCell id="uc-augment" value="数据增强预览" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="260" y="450" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-gpu-monitor" value="GPU监控" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="420" y="450" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <!-- 命令行工具用例组 -->
+    <mxCell id="cli-group" value="命令行工具" style="swimlane;horizontal=0;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+      <mxGeometry x="230" y="510" width="520" height="340" as="geometry" />
+    </mxCell>
+    
+    <!-- 模型训练 -->
+    <mxCell id="uc-train" value="模型训练" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="260" y="560" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-inference" value="模型推理" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="420" y="560" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-test" value="模型测试" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="580" y="560" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <!-- 数据处理 -->
+    <mxCell id="uc-convert" value="数据转换" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="260" y="650" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-monitor" value="训练监控" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="420" y="650" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-instance-seg" value="实例分割" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="580" y="650" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <!-- 数据处理模块 -->
+    <mxCell id="data-group" value="数据处理" style="swimlane;horizontal=0;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+      <mxGeometry x="800" y="130" width="520" height="200" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-dataset" value="数据集管理" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="830" y="180" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-yolo" value="YOLO转换" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="990" y="180" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-validate" value="数据验证" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="1150" y="180" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-augment-cli" value="数据增强" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="830" y="260" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <!-- 模型管理模块 -->
+    <mxCell id="model-group" value="模型管理" style="swimlane;horizontal=0;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+      <mxGeometry x="800" y="360" width="520" height="200" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-model-detail" value="模型详情" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="830" y="410" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-model-upload2" value="上传模型" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="990" y="410" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="uc-model-delete2" value="删除模型" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+      <mxGeometry x="1150" y="410" width="120" height="60" as="geometry" />
+    </mxCell>
+    
+    <!-- 关联关系 - Web用户 -->
+    <mxCell id="rel-user-1" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="actor-user" target="uc-segment">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-user-2" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="actor-user" target="uc-batch-segment">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-user-3" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="actor-user" target="uc-view-result">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-user-4" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="actor-user" target="uc-model-list">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-user-5" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="actor-user" target="uc-history">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-user-6" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="actor-user" target="uc-compare">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-user-7" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="actor-user" target="uc-gpu-monitor">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <!-- 关联关系 - 算法工程师 -->
+    <mxCell id="rel-eng-1" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1" source="actor-engineer" target="uc-train">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-eng-2" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1" source="actor-engineer" target="uc-inference">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-eng-3" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1" source="actor-engineer" target="uc-test">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-eng-4" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1" source="actor-engineer" target="uc-convert">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-eng-5" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1" source="actor-engineer" target="uc-monitor">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-eng-6" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1" source="actor-engineer" target="uc-instance-seg">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-eng-7" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1" source="actor-engineer" target="uc-augment">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <!-- 关联关系 - 系统管理员 -->
+    <mxCell id="rel-admin-1" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#d79b00;" edge="1" parent="1" source="actor-admin" target="uc-model-upload2">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-admin-2" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#d79b00;" edge="1" parent="1" source="actor-admin" target="uc-model-delete2">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-admin-3" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#d79b00;" edge="1" parent="1" source="actor-admin" target="uc-gpu-monitor">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <!-- 关联关系 - GPU资源 -->
+    <mxCell id="rel-gpu-1" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#b85450;dashed=1;" edge="1" parent="1" source="actor-gpu" target="uc-train">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-gpu-2" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#b85450;dashed=1;" edge="1" parent="1" source="actor-gpu" target="uc-inference">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="rel-gpu-3" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#b85450;dashed=1;" edge="1" parent="1" source="actor-gpu" target="uc-segment">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <!-- 包含关系 -->
+    <mxCell id="inc-1" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;html=1;rounded=0;dashed=1;strokeWidth=1.5;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="uc-segment" target="uc-model-list">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="inc-2" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;html=1;rounded=0;dashed=1;strokeWidth=1.5;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="uc-batch-segment" target="uc-model-list">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="inc-3" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;html=1;rounded=0;dashed=1;strokeWidth=1.5;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="uc-train" target="uc-yolo">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="inc-4" value="&lt;&lt;include&gt;&gt;" style="endArrow=open;html=1;rounded=0;dashed=1;strokeWidth=1.5;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="uc-train" target="uc-dataset">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <!-- 扩展关系 -->
+    <mxCell id="ext-1" value="&lt;&lt;extend&gt;&gt;" style="endArrow=open;html=1;rounded=0;dashed=1;strokeWidth=1.5;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="uc-monitor" target="uc-train">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="ext-2" value="&lt;&lt;extend&gt;&gt;" style="endArrow=open;html=1;rounded=0;dashed=1;strokeWidth=1.5;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="uc-instance-seg" target="uc-inference">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    
+    <!-- 图例 -->
+    <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="800" y="590" width="520" height="260" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="legend-title" value="图例说明" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=16;fontColor=#333333;" vertex="1" parent="1">
+      <mxGeometry x="1000" y="600" width="120" height="30" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="legend-user" value="Web用户用例" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="830" y="640" width="100" height="40" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="legend-eng" value="算法工程师用例" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="960" y="640" width="110" height="40" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="legend-admin" value="管理员用例" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1100" y="640" width="100" height="40" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="legend-include" value="&lt;&lt;include&gt;&gt; 包含关系" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="830" y="700" width="150" height="30" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="legend-extend" value="&lt;&lt;extend&gt;&gt; 扩展关系" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="830" y="740" width="150" height="30" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="legend-actor" value="参与者（Actor）" style="shape=umlActor;html=1;outlineConnect=0;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="860" y="780" width="30" height="50" as="geometry" />
+    </mxCell>
+    
+    <mxCell id="legend-actor-text" value="" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="900" y="795" width="100" height="30" as="geometry" />
+    </mxCell>
+    
+  </root>
+</mxGraphModel>'''
+
+
+def main():
+    print("=" * 60)
+    print("道路车辆分割系统 - 用例图绘制")
+    print("=" * 60)
+    
+    client = DrawIOMCPClient()
+    
+    try:
+        # 启动MCP服务器
+        print("\n[1/3] 启动draw.io MCP服务器...")
+        client.start()
+        time.sleep(2)
+        
+        # 启动会话
+        print("\n[2/3] 启动绘图会话...")
+        if client.start_session():
+            print("✓ 会话启动成功，浏览器窗口已打开")
+            time.sleep(3)
+            
+            # 创建用例图
+            print("\n[3/3] 创建用例图...")
+            xml = create_usecase_diagram_xml()
+            if client.create_diagram(xml):
+                print("✓ 用例图创建成功")
+                print("\n请在浏览器中查看实时预览")
+                print("图表包含:")
+                print("  - 4个参与者（Web用户、算法工程师、系统管理员、GPU资源）")
+                print("  - Web平台用例组")
+                print("  - 命令行工具用例组")
+                print("  - 数据处理模块")
+                print("  - 模型管理模块")
+                print("  - 包含关系和扩展关系")
+                
+                # 等待图表渲染
+                print("\n等待图表渲染...")
+                time.sleep(3)
+                
+                # 导出图表
+                export_path = "/Users/sux/IdeaProjects/maesx.github.io/docs/usecase_diagram_mcp.drawio"
+                if client.export_diagram(export_path):
+                    print(f"\n✓ 图表已导出到: {export_path}")
+                else:
+                    print("\n✗ 导出图表失败")
+            else:
+                print("✗ 创建图表失败")
+        else:
+            print("✗ 启动会话失败")
+            
+    except KeyboardInterrupt:
+        print("\n\n用户中断")
+    except Exception as e:
+        print(f"\n✗ 发生错误: {e}")
+    finally:
+        client.close()
+        print("\n完成！")
+
+
+if __name__ == '__main__':
+    main()

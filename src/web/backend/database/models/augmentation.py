@@ -26,6 +26,7 @@ class AugmentationRecord(Base):
     # 增强信息
     augmentation_type = Column(String(255), nullable=False, comment='增强类型（中文描述+参数）')
     methods_used = Column(JSON, nullable=False, comment='使用的增强方法列表')
+    result_images = Column(JSON, nullable=False, comment='增强结果图片列表')
     num_variations = Column(Integer, default=3, comment='生成变体数量')
     
     # 图像属性
@@ -55,6 +56,7 @@ class AugmentationRecord(Base):
             'user_id': self.user_id,
             'augmentation_type': self.augmentation_type,
             'methods_used': self.methods_used,
+            'result_images': self.result_images,
             'num_variations': self.num_variations,
             'image_width': self.image_width,
             'image_height': self.image_height,

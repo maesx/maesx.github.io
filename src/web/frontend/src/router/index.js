@@ -44,6 +44,18 @@ const routes = [
         name: 'Augmentation',
         component: () => import('@/views/Augmentation.vue'),
         meta: { title: '数据增强' }
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/Profile.vue'),
+        meta: { title: '个人中心' }
+      },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('@/views/Settings.vue'),
+        meta: { title: '系统设置' }
       }
     ]
   }

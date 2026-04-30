@@ -7,10 +7,8 @@
 ALTER TABLE models
 ADD COLUMN parent_model_id BIGINT COMMENT '父模型ID（用于版本继承）' AFTER version;
 
--- 添加外键约束（自引用）
-ALTER TABLE models
-ADD CONSTRAINT fk_model_parent
-FOREIGN KEY (parent_model_id) REFERENCES models(id) ON DELETE SET NULL;
+-- 添加逻辑外键索引（无物理外键约束）
+-- 逻辑外键: parent_model_id 关联 models.id (应用层维护引用完整性)
 
 -- 添加 changelog 字段
 ALTER TABLE models

@@ -94,7 +94,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { visualizationApi } from '@/api/modules'
@@ -111,6 +111,9 @@ const userInfo = ref({
 const activeMenu = computed(() => route.path)
 
 const pageTitle = computed(() => route.meta.title || '图像分割')
+
+// 定时器引用，用于组件卸载时清理
+let gpuStatusInterval = null
 
 const fetchGPUStatus = async () => {
   try {
@@ -132,10 +135,10 @@ const handleCommand = (command) => {
       ElMessage.success('已退出登录')
       break
     case 'profile':
-      ElMessage.info('个人中心功能开发中')
+      router.push('/profile')
       break
     case 'settings':
-      ElMessage.info('系统设置功能开发中')
+      router.push('/settings')
       break
   }
 }
@@ -149,7 +152,15 @@ onMounted(() => {
   
   // 获取GPU状态
   fetchGPUStatus()
-  setInterval(fetchGPUStatus, 5000) // 每5秒刷新一次
+  gpuStatusInterval = setInterval(fetchGPUStatus, 5000) // 每5秒刷新一次
+})
+
+// 组件卸载时清理定时器，防止内存泄漏
+onUnmounted(() => {
+  if (gpuStatusInterval) {
+    clearInterval(gpuStatusInterval)
+    gpuStatusInterval = null
+  }
 })
 </script>
 

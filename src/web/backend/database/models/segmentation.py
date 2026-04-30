@@ -24,7 +24,6 @@ class SegmentationRecord(Base):
     # 图像数据（Base64编码）
     original_image = Column(LongText, nullable=False, comment='原图（Base64编码）')
     result_image = Column(LongText, nullable=False, comment='分割结果图（Base64编码）')
-    fused_image = Column(LongText, comment='融合图像（Base64编码）')
     
     # 分割参数
     segment_type = Column(
@@ -43,9 +42,6 @@ class SegmentationRecord(Base):
     processing_time = Column(Float, comment='处理耗时（秒）')
     iou_score = Column(Float, comment='IoU得分')
     accuracy = Column(Float, comment='准确率')
-    class_iou = Column(JSON, comment='各类别IoU得分列表')
-    pixel_distribution = Column(JSON, comment='各类别像素占比列表')
-    instance_info = Column(JSON, comment='实例分割信息（实例数量、边界框等）')
     additional_metrics = Column(JSON, comment='其他评估指标')
     
     # 状态信息
@@ -76,9 +72,6 @@ class SegmentationRecord(Base):
             'processing_time': self.processing_time,
             'iou_score': self.iou_score,
             'accuracy': self.accuracy,
-            'class_iou': self.class_iou,
-            'pixel_distribution': self.pixel_distribution,
-            'instance_info': self.instance_info,
             'additional_metrics': self.additional_metrics,
             'status': self.status,
             'error_message': self.error_message,

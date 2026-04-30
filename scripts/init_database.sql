@@ -77,9 +77,9 @@ CREATE TABLE IF NOT EXISTS segmentation_records (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_user_id (user_id),
     INDEX idx_model_id (model_id),
-    INDEX idx_created_at (created_at),
-    FOREIGN KEY fk_segment_user (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY fk_segment_model (model_id) REFERENCES models(id) ON DELETE SET NULL
+    INDEX idx_created_at (created_at)
+    -- 逻辑外键: user_id 关联 users.id (应用层维护引用完整性)
+    -- 逻辑外键: model_id 关联 models.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图像分割记录表';
 
 -- ============================================
@@ -101,8 +101,8 @@ CREATE TABLE IF NOT EXISTS augmentation_records (
     error_message TEXT COMMENT '错误信息',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_user_id (user_id),
-    INDEX idx_created_at (created_at),
-    FOREIGN KEY fk_augment_user (user_id) REFERENCES users(id) ON DELETE CASCADE
+    INDEX idx_created_at (created_at)
+    -- 逻辑外键: user_id 关联 users.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据增强记录表';
 
 -- ============================================
@@ -121,8 +121,8 @@ CREATE TABLE IF NOT EXISTS operation_logs (
     INDEX idx_user_id (user_id),
     INDEX idx_operation_type (operation_type),
     INDEX idx_resource (resource_type, resource_id),
-    INDEX idx_created_at (created_at),
-    FOREIGN KEY fk_log_user (user_id) REFERENCES users(id) ON DELETE SET NULL
+    INDEX idx_created_at (created_at)
+    -- 逻辑外键: user_id 关联 users.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
 
 -- ============================================

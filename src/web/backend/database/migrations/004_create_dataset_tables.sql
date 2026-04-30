@@ -35,14 +35,9 @@ CREATE TABLE IF NOT EXISTS dataset_images (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_dataset_id (dataset_id),
     INDEX idx_annotation_status (annotation_status),
-    CONSTRAINT fk_dataset_image_dataset
-        FOREIGN KEY (dataset_id)
-        REFERENCES datasets(id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_dataset_image_user
-        FOREIGN KEY (uploaded_by)
-        REFERENCES users(id)
-        ON DELETE SET NULL
+    INDEX idx_uploaded_by (uploaded_by)
+    -- 逻辑外键: dataset_id 关联 datasets.id (应用层维护引用完整性)
+    -- 逻辑外键: uploaded_by 关联 users.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据集图像表';
 
 -- 验证表创建成功

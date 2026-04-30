@@ -13,10 +13,8 @@ CREATE TABLE IF NOT EXISTS augmentation_results (
     image_height INT COMMENT '图像高度',
     image_format VARCHAR(10) COMMENT '图像格式',
     INDEX idx_record_id (record_id),
-    CONSTRAINT fk_augment_result_record
-        FOREIGN KEY (record_id)
-        REFERENCES augmentation_records(id)
-        ON DELETE CASCADE
+    INDEX idx_variation_index (variation_index)
+    -- 逻辑外键: record_id 关联 augmentation_records.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据增强结果表';
 
 -- 2. 迁移现有数据（从 JSON 数组拆分为独立记录）

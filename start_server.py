@@ -51,8 +51,10 @@ def run_backend():
     try:
         for line in iter(process.stdout.readline, ''):
             print(f"[后端] {line.rstrip()}")
-    except:
+    except (KeyboardInterrupt, SystemExit):
         pass
+    except Exception as e:
+        print(f"[后端] 读取输出时发生错误: {e}")
     
 def run_frontend():
     """启动前端服务"""
@@ -110,8 +112,10 @@ def run_frontend():
     try:
         for line in iter(process.stdout.readline, ''):
             print(f"[前端] {line.rstrip()}")
-    except:
+    except (KeyboardInterrupt, SystemExit):
         pass
+    except Exception as e:
+        print(f"[前端] 读取输出时发生错误: {e}")
 
 def signal_handler(sig, frame):
     """处理 Ctrl+C 信号"""

@@ -24,8 +24,6 @@ class Model(Base):
         comment='模型类型'
     )
     version = Column(String(20), comment='模型版本号（如"1.0.0"）')
-    parent_model_id = Column(BigInteger, ForeignKey('models.id', ondelete='SET NULL'), comment='父模型ID（用于版本继承）')
-    changelog = Column(Text, comment='版本变更日志')
     description = Column(Text, comment='模型描述')
     
     # 文件信息
@@ -43,7 +41,6 @@ class Model(Base):
     # 状态管理
     is_active = Column(SmallInteger, default=1, index=True, comment='是否启用')
     is_default = Column(SmallInteger, default=0, comment='是否默认模型')
-    is_latest = Column(SmallInteger, default=1, index=True, comment='是否为最新版本')
     
     # 时间信息
     created_at = Column(DateTime, default=datetime.now, comment='创建时间')
@@ -62,8 +59,6 @@ class Model(Base):
             'model_name': self.model_name,
             'model_type': self.model_type,
             'version': self.version,
-            'parent_model_id': self.parent_model_id,
-            'changelog': self.changelog,
             'description': self.description,
             'model_path': self.model_path,
             'model_size': self.model_size,
@@ -73,7 +68,6 @@ class Model(Base):
             'performance_metrics': self.performance_metrics,
             'is_active': self.is_active,
             'is_default': self.is_default,
-            'is_latest': self.is_latest,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

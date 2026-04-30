@@ -4,6 +4,7 @@ Flask应用主入口
 """
 import os
 import sys
+import threading
 from datetime import datetime
 
 # 添加项目根目录到路径
@@ -16,10 +17,52 @@ from flask_restful import Api
 from src.web.backend.app_config import Config
 
 
+def preload_models_async(app):
+    """
+    异步预热模型列表缓存
+    在后台线程中执行,避免阻塞服务启动
+    """
+    try:
+        from src.web.backend.services.model_service import get_model_service
+        model_service = get_model_service(app.config['CHECKPOINT_FOLDER'])
+        # 首次调用会加载模型列表并缓存
+        models = model_service.get_model_list(use_cache=False)  # 强制刷新缓存
+        print(f"[Preload] 模型列表缓存预热完成,共 {len(models)} 个模型")
+    except Exception as e:
+        print(f"[Preload] 模型列表缓存预热失败: {e}")
+
+
+def init_database_async(app):
+    """
+    异步初始化数据库连接
+    在后台线程中执行,避免阻塞服务启动
+    """
+    try:
+        from src.web.backend.database.session import init_database
+        from src.web.backend.config.database import db_config
+        
+        # 初始化数据库连接
+        init_database()
+        
+        if db_config.use_mysql:
+            print(f"[Database] ✅ MySQL数据库连接成功")
+            app.config['DB_AVAILABLE'] = True
+        else:
+            print(f"[Database] ⚠️  MySQL数据库未启用,将使用文件存储")
+            app.config['DB_AVAILABLE'] = False
+            
+    except Exception as e:
+        print(f"[Database] ❌ MySQL数据库初始化失败: {e}")
+        app.config['DB_AVAILABLE'] = False
+
+
 def create_app(config_class=Config):
     """创建Flask应用"""
     app = Flask(__name__)
     app.config.from_object(config_class)
+    
+    # 初始化数据库可用性标志
+    app.config['DB_AVAILABLE'] = False
     
     # 启用CORS
     CORS(app, resources={
@@ -46,11 +89,24 @@ def create_app(config_class=Config):
         BatchDownloadResource
     )
     from src.web.backend.routes.visualization import VisualizationResource, GPUMonitorResource
-    from src.web.backend.routes.auth import LoginResource
+    from src.web.backend.routes.auth import LoginResource, RegisterResource
     from src.web.backend.routes.augmentation import AugmentationPreviewResource, AugmentationDownloadResource
+    from src.web.backend.routes.profile import ProfileResource, AvatarResource, PasswordResource
+    from src.web.backend.routes.settings import SystemConfigResource, StorageInfoResource, LogsResource
     
     # API路由
     api.add_resource(LoginResource, '/api/login')
+    api.add_resource(RegisterResource, '/api/register')
+    
+    # 用户个人中心
+    api.add_resource(ProfileResource, '/api/profile/<int:user_id>')
+    api.add_resource(AvatarResource, '/api/profile/<int:user_id>/avatar')
+    api.add_resource(PasswordResource, '/api/profile/<int:user_id>/password')
+    
+    # 系统设置
+    api.add_resource(SystemConfigResource, '/api/settings/config')
+    api.add_resource(StorageInfoResource, '/api/settings/storage')
+    api.add_resource(LogsResource, '/api/settings/logs')
     
     # 模型管理
     api.add_resource(ModelsResource, '/api/models')
@@ -124,6 +180,16 @@ if __name__ == '__main__':
     print(f"📊 结果目录: {app.config['RESULT_FOLDER']}")
     print(f"🤖 模型目录: {app.config['CHECKPOINT_FOLDER']}")
     print("="*60 + "\n")
+    
+    # 在后台线程中初始化数据库连接
+    db_thread = threading.Thread(target=init_database_async, args=(app,), daemon=True)
+    db_thread.start()
+    print("[Startup] 正在后台初始化数据库连接...")
+    
+    # 在后台线程中预热模型列表缓存
+    preload_thread = threading.Thread(target=preload_models_async, args=(app,), daemon=True)
+    preload_thread.start()
+    print("[Startup] 正在后台预热模型列表缓存...")
     
     app.run(
         host=app.config['HOST'],

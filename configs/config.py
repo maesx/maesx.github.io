@@ -4,9 +4,9 @@ import os
 # 数据配置
 DATA_CONFIG = {
     'data_dir': 'road_vehicle_pedestrian_det_datasets',
-    'masks_dir': 'outputs/masks',
-    'classes': ['car', 'truck', 'bus'],  # 要分割的车辆类别
-    'num_classes': 4,  # 包括背景
+    'masks_dir': 'outputs/masks_car',  # 车辆专用掩码目录
+    'classes': ['car', 'truck', 'bus'],  # 要分割的车辆类别（不含行人）
+    'num_classes': 4,  # 包括背景 + 3种车辆
 }
 
 # 模型配置
@@ -47,13 +47,16 @@ INFERENCE_CONFIG = {
     'device': 'cpu',  # 'cpu' 或 'cuda'
 }
 
-# 类别颜色映射 (BGR格式)
+# 类别颜色映射 (BGR格式) - 专注于车辆分割
 CLASS_COLORS = {
     0: [0, 0, 0],        # 背景 - 黑色
     1: [0, 0, 255],      # car - 红色
     2: [0, 255, 0],      # truck - 绿色
     3: [255, 0, 0],      # bus - 蓝色
 }
+
+# 类别名称映射（用于显示）
+CLASS_NAMES = ['Background', 'Car', 'Truck', 'Bus']
 
 # 目录配置
 OUTPUT_DIR = 'outputs'

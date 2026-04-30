@@ -9,6 +9,65 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class FocalLoss(nn.Module):
+    """Focal Loss - 专注于难分类样本"""
+    
+    def __init__(self, alpha: torch.Tensor = None, gamma: float = 2.0, smooth: float = 1e-6) -> None:
+        """
+        Args:
+            alpha: 类别权重 [C]
+            gamma: 聚焦参数，越大越关注难样本
+            smooth: 平滑项
+        """
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.smooth = smooth
+        if alpha is not None:
+            self.register_buffer('alpha', alpha)
+        else:
+            self.alpha = None
+    
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            pred: 预测结果 [B, C, H, W]
+            target: 真实标签 [B, H, W]
+        """
+        device = pred.device
+        
+        # 获取概率 - 使用 log_softmax 避免 MPS 问题
+        log_pred_prob = F.log_softmax(pred, dim=1)  # [B, C, H, W]
+        pred_prob = torch.exp(log_pred_prob)
+        
+        # 转为one-hot
+        num_classes = pred.size(1)
+        target_long = target.long()
+        target_one_hot = F.one_hot(target_long, num_classes=num_classes)
+        target_one_hot = target_one_hot.permute(0, 3, 1, 2).float()  # [B, C, H, W]
+        
+        # 获取正确类别的概率
+        pt = (pred_prob * target_one_hot).sum(dim=1)  # [B, H, W]
+        
+        # 计算 focal weight
+        focal_weight = (1 - pt) ** self.gamma
+        
+        # 计算 CrossEntropy - 使用 log_softmax 的结果
+        ce_loss = F.nll_loss(log_pred_prob, target_long, reduction='none')  # [B, H, W]
+        
+        # 应用 focal weight
+        focal_loss = focal_weight * ce_loss
+        
+        # 应用类别权重 - 确保alpha在正确的设备上
+        if self.alpha is not None:
+            # 将alpha移到正确的设备
+            alpha_device = self.alpha.to(device)
+            # 根据目标类别获取权重
+            alpha_t = alpha_device[target_long]  # [B, H, W]
+            focal_loss = alpha_t * focal_loss
+        
+        return focal_loss.mean()
+
+
 class DiceLoss(nn.Module):
     """Dice损失函数"""
 
@@ -45,6 +104,45 @@ class DiceLoss(nn.Module):
         return dice_loss
 
 
+class BoundaryLoss(nn.Module):
+    """边界损失函数
+    
+    用于增强分割边界的准确性
+    """
+    
+    def __init__(self, theta0: float = 3.0, theta: float = 5.0) -> None:
+        """
+        Args:
+            theta0: 边界宽度参数
+            theta: 损失缩放参数
+        """
+        super(BoundaryLoss, self).__init__()
+        self.theta0 = theta0
+        self.theta = theta
+    
+    def forward(
+        self,
+        pred_boundary: torch.Tensor,
+        target_boundary: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Args:
+            pred_boundary: 预测的边界图 [B, 1, H, W]
+            target_boundary: 真实的边界图 [B, 1, H, W]
+        
+        Returns:
+            boundary_loss: 边界损失
+        """
+        # 使用 BCE 损失计算边界误差
+        bce_loss = F.binary_cross_entropy_with_logits(
+            pred_boundary, 
+            target_boundary.float(),
+            reduction='mean'
+        )
+        
+        return bce_loss
+
+
 class CombinedLoss(nn.Module):
     """组合损失: CrossEntropy + Dice + Focal Loss
     
@@ -56,31 +154,30 @@ class CombinedLoss(nn.Module):
         self, 
         weight_ce: float = 1.0, 
         weight_dice: float = 1.0,
-        weight_focal: float = 0.0,
-        class_weights: Optional[torch.Tensor] = None
+        weight_focal: float = 1.0,
+        class_weights: Optional[torch.Tensor] = None,
+        focal_gamma: float = 2.0
     ) -> None:
         """
         Args:
             weight_ce: CrossEntropy 损失权重
             weight_dice: Dice 损失权重
-            weight_focal: Focal Loss 权重 (0表示不使用)
+            weight_focal: Focal Loss 权重
             class_weights: 类别权重 [C]
+            focal_gamma: Focal Loss gamma参数
         """
         super(CombinedLoss, self).__init__()
         self.weight_ce = weight_ce
         self.weight_dice = weight_dice
         self.weight_focal = weight_focal
-        if class_weights is not None:
-            self.register_buffer('class_weights', class_weights)
-        else:
-            self.class_weights = None
         
-        # CrossEntropyLoss在初始化时不需要权重在CPU上
-        if class_weights is not None:
-            self.ce_loss = nn.CrossEntropyLoss(weight=class_weights.cpu())
-        else:
-            self.ce_loss = nn.CrossEntropyLoss()
+        # 存储类别权重（不注册为buffer，避免设备问题）
+        self.class_weights_tensor = class_weights
+        
+        # CrossEntropyLoss - 不在这里指定权重，在forward中处理
+        self.ce_loss = nn.CrossEntropyLoss(weight=None)
         self.dice_loss = DiceLoss()
+        self.focal_loss = FocalLoss(alpha=class_weights, gamma=focal_gamma)
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
@@ -88,20 +185,20 @@ class CombinedLoss(nn.Module):
             pred: 预测结果 [B, C, H, W]
             target: 真实标签 [B, H, W]
         """
-        # 检查是否是MPS设备，如果是则在CPU上计算CrossEntropy
         device = pred.device
-        if device.type == 'mps':
-            # 在CPU上计算CrossEntropy
-            pred_cpu = pred.cpu()
-            target_cpu = target.cpu().long()  # 确保是long类型
-            ce = self.ce_loss(pred_cpu, target_cpu)
-            ce = ce.to(device)  # 移回原设备
+        
+        # 如果有类别权重，在forward中动态创建CE损失（确保权重在正确设备上）
+        if self.class_weights_tensor is not None:
+            weights = self.class_weights_tensor.to(device)
+            ce_loss_fn = nn.CrossEntropyLoss(weight=weights)
+            ce = ce_loss_fn(pred, target)
         else:
             ce = self.ce_loss(pred, target)
         
         dice = self.dice_loss(pred, target)
+        focal = self.focal_loss(pred, target)
         
-        return self.weight_ce * ce + self.weight_dice * dice
+        return self.weight_ce * ce + self.weight_dice * dice + self.weight_focal * focal
 
 
 class DeepSupervisionLoss(nn.Module):

@@ -22,7 +22,7 @@
       
       <!-- 历史记录表格 -->
       <el-table v-else :data="historyList" stripe style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="display_id" label="ID" width="120" />
         <el-table-column prop="model" label="模型" width="180" />
         <el-table-column label="原图" width="120">
           <template #default="scope">
@@ -88,11 +88,12 @@ const refreshHistory = () => {
 
 const viewDetail = (row) => {
   // TODO: 实现查看详情弹窗
-  ElMessage.info(`查看详情: ${row.id}`)
+  ElMessage.info(`查看详情: ${row.display_id}`)
 }
 
 const addToCompare = async (row) => {
   try {
+    // 使用原始ID进行对比列表关联
     const response = await segmentApi.addToCompare(row.id)
     if (response.success) {
       ElMessage.success('已添加到对比列表')
@@ -111,7 +112,7 @@ const deleteRecord = async (row) => {
       type: 'warning'
     })
     
-    // 从本地列表中移除
+    // 从本地列表中移除（使用原始ID匹配）
     const index = historyList.value.findIndex(item => item.id === row.id)
     if (index > -1) {
       historyList.value.splice(index, 1)

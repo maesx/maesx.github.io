@@ -63,8 +63,8 @@ CREATE TABLE `models` (
     KEY `idx_model_type` (`model_type`),
     KEY `idx_is_active` (`is_active`),
     KEY `idx_is_latest` (`is_latest`),
-    KEY `idx_parent_model` (`parent_model_id`),
-    CONSTRAINT `fk_model_parent` FOREIGN KEY (`parent_model_id`) REFERENCES `models` (`id`) ON DELETE SET NULL
+    KEY `idx_parent_model` (`parent_model_id`)
+    -- 逻辑外键: parent_model_id 关联 models.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模型管理表';
 
 -- =====================================================
@@ -98,9 +98,9 @@ CREATE TABLE `segmentation_records` (
     KEY `idx_model_id` (`model_id`),
     KEY `idx_created_at` (`created_at`),
     KEY `idx_status` (`status`),
-    KEY `idx_segment_type` (`segment_type`),
-    CONSTRAINT `fk_segmentation_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_segmentation_model` FOREIGN KEY (`model_id`) REFERENCES `models` (`id`) ON DELETE SET NULL
+    KEY `idx_segment_type` (`segment_type`)
+    -- 逻辑外键: user_id 关联 users.id (应用层维护引用完整性)
+    -- 逻辑外键: model_id 关联 models.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图像分割记录表';
 
 -- =====================================================
@@ -124,8 +124,8 @@ CREATE TABLE `augmentation_records` (
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_created_at` (`created_at`),
-    KEY `idx_status` (`status`),
-    CONSTRAINT `fk_augmentation_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+    KEY `idx_status` (`status`)
+    -- 逻辑外键: user_id 关联 users.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据增强记录表';
 
 -- =====================================================
@@ -142,8 +142,8 @@ CREATE TABLE `augmentation_results` (
     `image_format` VARCHAR(10) DEFAULT NULL COMMENT '图像格式',
     PRIMARY KEY (`id`),
     KEY `idx_record_id` (`record_id`),
-    KEY `idx_variation_index` (`variation_index`),
-    CONSTRAINT `fk_augment_result_record` FOREIGN KEY (`record_id`) REFERENCES `augmentation_records` (`id`) ON DELETE CASCADE
+    KEY `idx_variation_index` (`variation_index`)
+    -- 逻辑外键: record_id 关联 augmentation_records.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据增强结果表';
 
 -- =====================================================
@@ -188,9 +188,9 @@ CREATE TABLE `dataset_images` (
     KEY `idx_dataset_id` (`dataset_id`),
     KEY `idx_uploaded_by` (`uploaded_by`),
     KEY `idx_annotation_status` (`annotation_status`),
-    KEY `idx_filename` (`filename`),
-    CONSTRAINT `fk_dataset_image_dataset` FOREIGN KEY (`dataset_id`) REFERENCES `datasets` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_dataset_image_user` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+    KEY `idx_filename` (`filename`)
+    -- 逻辑外键: dataset_id 关联 datasets.id (应用层维护引用完整性)
+    -- 逻辑外键: uploaded_by 关联 users.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据集图像表';
 
 -- =====================================================
@@ -211,8 +211,8 @@ CREATE TABLE `operation_logs` (
     KEY `idx_user_id` (`user_id`),
     KEY `idx_operation_type` (`operation_type`),
     KEY `idx_resource_type` (`resource_type`),
-    KEY `idx_created_at` (`created_at`),
-    CONSTRAINT `fk_operation_log_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+    KEY `idx_created_at` (`created_at`)
+    -- 逻辑外键: user_id 关联 users.id (应用层维护引用完整性)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
 
 -- =====================================================

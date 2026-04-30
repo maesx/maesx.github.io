@@ -65,15 +65,15 @@ class Config:
     RESULT_FOLDER = os.path.join(BASE_DIR, 'outputs', 'results')
     CHECKPOINT_FOLDER = os.path.join(BASE_DIR, 'outputs', 'checkpoints')
     
-    # 模型配置
+    # 模型配置 - 专注于车辆分割
     MODEL_INPUT_SIZE = (512, 512)
     NUM_CLASSES = 4
-    CLASS_NAMES = ['Background', 'Road', 'Vehicle', 'Pedestrian']
+    CLASS_NAMES = ['Background', 'Car', 'Truck', 'Bus']
     CLASS_COLORS = [
         [0, 0, 0],        # 背景 - 黑色
-        [128, 128, 128],  # 道路 - 灰色
-        [243, 156, 18],   # 车辆 - 亮橙色 (RGB: #F39C12)
-        [255, 0, 0]       # 行人 - 红色
+        [0, 0, 255],      # Car - 红色 (BGR)
+        [0, 255, 0],      # Truck - 绿色 (BGR)
+        [255, 0, 0]       # Bus - 蓝色 (BGR)
     ]
     
     # YOLOv8配置

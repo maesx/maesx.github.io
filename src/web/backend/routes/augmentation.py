@@ -123,7 +123,11 @@ class AugmentationPreviewResource(Resource):
             augmentations_str = request.form.get('augmentations', '[]')
             try:
                 augmentations = json.loads(augmentations_str)
-            except:
+            except json.JSONDecodeError as e:
+                print(f"[Augmentation] JSON解析失败: {e}")
+                augmentations = []
+            except Exception as e:
+                print(f"[Augmentation] 解析增强参数时发生未知错误: {e}")
                 augmentations = []
             
             if not augmentations:
@@ -227,7 +231,14 @@ class AugmentationDownloadResource(Resource):
             results_json = request.form.get('results', '[]')
             try:
                 results = json.loads(results_json)
-            except:
+            except json.JSONDecodeError as e:
+                print(f"[Augmentation] JSON解析失败: {e}")
+                return {
+                    'success': False,
+                    'error': 'Invalid results data format'
+                }, 400
+            except Exception as e:
+                print(f"[Augmentation] 解析结果数据时发生未知错误: {e}")
                 return {
                     'success': False,
                     'error': 'Invalid results data'

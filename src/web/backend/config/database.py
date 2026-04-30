@@ -15,7 +15,7 @@ class MySQLConfig:
     port: int = 3306
     database: str = "image_segment_platform"
     user: str = "root"
-    password: str = ""
+    password: str = "123456"  # 默认密码修改为123456
     charset: str = "utf8mb4"
     
     # 连接池配置
@@ -44,7 +44,7 @@ class MySQLConfig:
             port=int(os.getenv('MYSQL_PORT', '3306')),
             database=os.getenv('MYSQL_DATABASE', 'image_segment_platform'),
             user=os.getenv('MYSQL_USER', 'root'),
-            password=os.getenv('MYSQL_PASSWORD', ''),
+            password=os.getenv('MYSQL_PASSWORD', '123456'),  # 默认密码123456
             charset=os.getenv('MYSQL_CHARSET', 'utf8mb4'),
             pool_size=int(os.getenv('MYSQL_POOL_SIZE', '10')),
             max_overflow=int(os.getenv('MYSQL_MAX_OVERFLOW', '20')),

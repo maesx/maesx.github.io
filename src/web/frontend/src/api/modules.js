@@ -26,6 +26,13 @@ export const modelApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: onProgress
     })
+  },
+
+  /**
+   * 删除模型
+   */
+  deleteModel(modelName) {
+    return api.delete(`/models/${modelName}`)
   }
 }
 
@@ -78,7 +85,7 @@ export const segmentApi = {
    * 清空对比列表
    */
   clearCompare() {
-    return api.delete('/segment/compare/clear')
+    return api.post('/segment/compare/clear')  // 后端使用POST方法
   },
 
   /**
@@ -152,5 +159,85 @@ export const authApi = {
    */
   login(credentials) {
     return api.post('/login', credentials)
+  },
+
+  /**
+   * 注册
+   */
+  register(userData) {
+    return api.post('/register', userData)
+  }
+}
+
+/**
+ * 个人中心API
+ */
+export const profileApi = {
+  /**
+   * 获取用户资料
+   */
+  getProfile(userId) {
+    return api.get(`/profile/${userId}`)
+  },
+
+  /**
+   * 更新用户资料
+   */
+  updateProfile(userId, data) {
+    return api.put(`/profile/${userId}`, data)
+  },
+
+  /**
+   * 上传头像
+   */
+  uploadAvatar(userId, data) {
+    return api.post(`/profile/${userId}/avatar`, data)
+  },
+
+  /**
+   * 删除头像
+   */
+  deleteAvatar(userId) {
+    return api.delete(`/profile/${userId}/avatar`)
+  },
+
+  /**
+   * 修改密码
+   */
+  changePassword(userId, data) {
+    return api.put(`/profile/${userId}/password`, data)
+  }
+}
+
+/**
+ * 系统设置API
+ */
+export const settingsApi = {
+  /**
+   * 获取系统配置
+   */
+  getConfig() {
+    return api.get('/settings/config')
+  },
+
+  /**
+   * 更新系统配置
+   */
+  updateConfig(config) {
+    return api.put('/settings/config', config)
+  },
+
+  /**
+   * 获取存储信息
+   */
+  getStorageInfo() {
+    return api.get('/settings/storage')
+  },
+
+  /**
+   * 获取系统日志
+   */
+  getLogs(params) {
+    return api.get('/settings/logs', { params })
   }
 }

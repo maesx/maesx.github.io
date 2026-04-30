@@ -1,244 +1,214 @@
 """
-图像增强服务
-支持基础增强和高级增强方式
+数据增强服务
+提供图像增强功能,用于Web界面
 """
 import random
 import numpy as np
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps
-from typing import List, Dict, Tuple, Any
-import io
+from PIL import Image, ImageEnhance, ImageFilter
+import albumentations as A
+from io import BytesIO
 import base64
 
 
 class AugmentationService:
-    """图像增强服务"""
+    """数据增强服务类"""
     
     def __init__(self):
+        """初始化增强服务"""
         self.augmentation_methods = {
-            # 基础增强
-            'rotate': self._rotate,
-            'flip': self._flip,
-            'scale': self._scale,
-            'crop': self._crop,
-            # 高级增强
-            'color': self._color_adjust,
-            'noise': self._add_noise,
-            'blur': self._blur,
-            'brightness': self._brightness_contrast
+            'horizontal_flip': '水平翻转',
+            'vertical_flip': '垂直翻转',
+            'rotation': '随机旋转',
+            'brightness': '亮度调整',
+            'contrast': '对比度调整',
+            'gaussian_blur': '高斯模糊',
+            'gaussian_noise': '高斯噪声',
+            'hue_saturation': '色调饱和度',
+            'random_crop': '随机裁剪',
+            'elastic_transform': '弹性形变',
+            'grid_distortion': '网格畸变',
         }
     
-    def augment_image(
-        self, 
-        image: np.ndarray, 
-        methods: List[str], 
-        num_variations: int = 3
-    ) -> List[Dict[str, Any]]:
+    def augment_image(self, image: np.ndarray, methods: list, num_variations: int = 3) -> list:
         """
-        对图像应用随机增强，生成多个变体
+        对图像应用增强效果
         
         Args:
-            image: 输入图像 (numpy数组，RGB格式)
-            methods: 要应用的增强方法列表
-            num_variations: 生成变体数量（默认3个）
+            image: numpy数组格式的图像 (H, W, C)
+            methods: 增强方法列表
+            num_variations: 生成变体数量
             
         Returns:
-            增强后的图像列表，每个元素包含图像和增强类型
+            增强后的图片列表 [{'image': base64_str, 'augmentation_type': str}, ...]
         """
-        # 英文到中文的映射
-        method_chinese_names = {
-            'rotate': '旋转',
-            'flip': '翻转',
-            'scale': '缩放',
-            'crop': '裁剪',
-            'color': '颜色调整',
-            'noise': '噪声',
-            'blur': '模糊',
-            'brightness': '亮度对比度'
-        }
+        results = []
         
-        variations = []
-        
-        for i in range(num_variations):
-            # 随机选择增强方法组合
-            num_methods = random.randint(1, min(3, len(methods)))
-            selected_methods = random.sample(methods, num_methods)
+        for _ in range(num_variations):
+            # 随机选择增强方法
+            selected_methods = random.sample(methods, min(len(methods), random.randint(2, 4)))
             
             # 应用增强
-            augmented = image.copy()
-            applied_methods_info = []
-            
-            for method_name in selected_methods:
-                if method_name in self.augmentation_methods:
-                    augmented, param_info = self.augmentation_methods[method_name](augmented)
-                    # 添加中文名称和参数信息
-                    chinese_name = method_chinese_names.get(method_name, method_name)
-                    if param_info:
-                        applied_methods_info.append(f"{chinese_name}({param_info})")
-                    else:
-                        applied_methods_info.append(chinese_name)
+            augmented = self._apply_augmentations(image, selected_methods)
             
             # 转换为base64
-            if isinstance(augmented, np.ndarray):
-                augmented_pil = Image.fromarray(augmented.astype('uint8'))
-            else:
-                augmented_pil = augmented
+            base64_str = self._numpy_to_base64(augmented)
             
-            buffered = io.BytesIO()
-            augmented_pil.save(buffered, format="PNG")
-            img_str = base64.b64encode(buffered.getvalue()).decode()
+            # 生成增强类型描述
+            method_names = [self.augmentation_methods.get(m, m) for m in selected_methods]
+            augmentation_type = ' + '.join(method_names)
             
-            variations.append({
-                'image': f"data:image/png;base64,{img_str}",
-                'augmentation_type': ' + '.join(applied_methods_info)
+            results.append({
+                'image': base64_str,
+                'augmentation_type': augmentation_type,
+                'methods': selected_methods
             })
         
-        return variations
+        return results
     
-    # ========== 基础增强方法 ==========
-    
-    def _rotate(self, image: np.ndarray) -> Tuple[np.ndarray, str]:
-        """随机旋转"""
-        angle = random.uniform(-30, 30)
-        pil_img = Image.fromarray(image)
-        rotated = pil_img.rotate(angle, expand=True, fillcolor=(128, 128, 128))
-        return np.array(rotated), f"{angle:.1f}°"
-    
-    def _flip(self, image: np.ndarray) -> Tuple[np.ndarray, str]:
-        """随机翻转"""
-        flip_type = random.choice(['horizontal', 'vertical'])
-        pil_img = Image.fromarray(image)
+    def _apply_augmentations(self, image: np.ndarray, methods: list) -> np.ndarray:
+        """
+        应用增强方法
         
-        if flip_type == 'horizontal':
-            flipped = ImageOps.mirror(pil_img)
-            return np.array(flipped), "水平"
-        else:
-            flipped = ImageOps.flip(pil_img)
-            return np.array(flipped), "垂直"
-    
-    def _scale(self, image: np.ndarray) -> Tuple[np.ndarray, str]:
-        """随机缩放"""
-        scale_factor = random.uniform(0.7, 1.3)
-        pil_img = Image.fromarray(image)
-        
-        new_width = int(pil_img.width * scale_factor)
-        new_height = int(pil_img.height * scale_factor)
-        
-        scaled = pil_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        
-        # 裁剪或填充到原始大小
-        orig_width, orig_height = pil_img.size
-        result = Image.new('RGB', (orig_width, orig_height), (128, 128, 128))
-        
-        # 计算粘贴位置（居中）
-        paste_x = (orig_width - new_width) // 2
-        paste_y = (orig_height - new_height) // 2
-        
-        if scale_factor >= 1:
-            # 缩放后更大，需要裁剪中心
-            crop_x = (new_width - orig_width) // 2
-            crop_y = (new_height - orig_height) // 2
-            result = scaled.crop((crop_x, crop_y, crop_x + orig_width, crop_y + orig_height))
-        else:
-            # 缩放后更小，需要填充
-            result.paste(scaled, (paste_x, paste_y))
-        
-        return np.array(result), f"{scale_factor:.2f}x"
-    
-    def _crop(self, image: np.ndarray) -> Tuple[np.ndarray, str]:
-        """随机裁剪"""
-        pil_img = Image.fromarray(image)
-        width, height = pil_img.size
-        
-        # 随机裁剪比例
-        crop_ratio = random.uniform(0.6, 0.9)
-        new_width = int(width * crop_ratio)
-        new_height = int(height * crop_ratio)
-        
-        # 随机裁剪位置
-        left = random.randint(0, width - new_width)
-        top = random.randint(0, height - new_height)
-        right = left + new_width
-        bottom = top + new_height
-        
-        cropped = pil_img.crop((left, top, right, bottom))
-        
-        # 调整回原始大小
-        resized = cropped.resize((width, height), Image.Resampling.LANCZOS)
-        
-        return np.array(resized), f"{crop_ratio:.0%}"
-    
-    # ========== 高级增强方法 ==========
-    
-    def _color_adjust(self, image: np.ndarray) -> Tuple[np.ndarray, str]:
-        """颜色调整"""
-        pil_img = Image.fromarray(image)
-        
-        # 随机调整色调、饱和度
-        enhancer = ImageEnhance.Color(pil_img)
-        factor = random.uniform(0.5, 1.5)
-        adjusted = enhancer.enhance(factor)
-        
-        return np.array(adjusted), f"饱和度{factor:.2f}"
-    
-    def _add_noise(self, image: np.ndarray) -> Tuple[np.ndarray, str]:
-        """添加噪声"""
-        noise_type = random.choice(['gaussian', 'salt_pepper'])
-        
-        if noise_type == 'gaussian':
-            # 高斯噪声
-            mean = 0
-            sigma = random.uniform(10, 30)
-            noise = np.random.normal(mean, sigma, image.shape)
-            noisy = np.clip(image + noise, 0, 255).astype(np.uint8)
-            return noisy, f"高斯σ={sigma:.1f}"
-        else:
-            # 椒盐噪声
-            prob = random.uniform(0.01, 0.05)
-            noisy = image.copy()
+        Args:
+            image: numpy数组格式的图像
+            methods: 增强方法列表
             
-            # 盐噪声（白点）
-            salt_mask = np.random.random(image.shape[:2]) < prob / 2
-            noisy[salt_mask] = 255
-            
-            # 椒噪声（黑点）
-            pepper_mask = np.random.random(image.shape[:2]) < prob / 2
-            noisy[pepper_mask] = 0
-            
-            return noisy, f"椒盐{prob:.1%}"
+        Returns:
+            增强后的图像
+        """
+        augmented = image.copy()
+        
+        # 转换为PIL Image用于某些增强
+        pil_image = Image.fromarray(augmented)
+        
+        for method in methods:
+            try:
+                if method == 'horizontal_flip':
+                    # 水平翻转
+                    if random.random() > 0.5:
+                        augmented = np.fliplr(augmented).copy()
+                
+                elif method == 'vertical_flip':
+                    # 垂直翻转
+                    if random.random() > 0.5:
+                        augmented = np.flipud(augmented).copy()
+                
+                elif method == 'rotation':
+                    # 随机旋转
+                    angle = random.uniform(-30, 30)
+                    pil_image = Image.fromarray(augmented)
+                    pil_image = pil_image.rotate(angle, resample=Image.BILINEAR, expand=False)
+                    augmented = np.array(pil_image)
+                
+                elif method == 'brightness':
+                    # 亮度调整
+                    factor = random.uniform(0.7, 1.3)
+                    pil_image = Image.fromarray(augmented)
+                    enhancer = ImageEnhance.Brightness(pil_image)
+                    pil_image = enhancer.enhance(factor)
+                    augmented = np.array(pil_image)
+                
+                elif method == 'contrast':
+                    # 对比度调整
+                    factor = random.uniform(0.7, 1.3)
+                    pil_image = Image.fromarray(augmented)
+                    enhancer = ImageEnhance.Contrast(pil_image)
+                    pil_image = enhancer.enhance(factor)
+                    augmented = np.array(pil_image)
+                
+                elif method == 'gaussian_blur':
+                    # 高斯模糊
+                    pil_image = Image.fromarray(augmented)
+                    pil_image = pil_image.filter(ImageFilter.GaussianBlur(radius=random.uniform(0.5, 2.0)))
+                    augmented = np.array(pil_image)
+                
+                elif method == 'gaussian_noise':
+                    # 高斯噪声
+                    noise = np.random.normal(0, random.uniform(10, 30), augmented.shape)
+                    augmented = np.clip(augmented + noise, 0, 255).astype(np.uint8)
+                
+                elif method == 'hue_saturation':
+                    # 色调饱和度调整
+                    pil_image = Image.fromarray(augmented)
+                    # 色调
+                    hue_factor = random.uniform(-15, 15)
+                    # 饱和度
+                    sat_factor = random.uniform(0.8, 1.2)
+                    
+                    enhancer = ImageEnhance.Color(pil_image)
+                    pil_image = enhancer.enhance(sat_factor)
+                    augmented = np.array(pil_image)
+                
+                elif method == 'random_crop':
+                    # 随机裁剪(resize back to original size)
+                    h, w = augmented.shape[:2]
+                    crop_h, crop_w = int(h * random.uniform(0.8, 0.95)), int(w * random.uniform(0.8, 0.95))
+                    top = random.randint(0, h - crop_h)
+                    left = random.randint(0, w - crop_w)
+                    cropped = augmented[top:top+crop_h, left:left+crop_w]
+                    pil_image = Image.fromarray(cropped)
+                    pil_image = pil_image.resize((w, h), Image.BILINEAR)
+                    augmented = np.array(pil_image)
+                
+                elif method == 'elastic_transform':
+                    # 弹性形变(简化版)
+                    try:
+                        transform = A.ElasticTransform(p=1.0, alpha=120, sigma=120 * 0.05, alpha_affine=120 * 0.03)
+                        augmented = transform(image=augmented)['image']
+                    except:
+                        pass  # 如果失败则跳过
+                
+                elif method == 'grid_distortion':
+                    # 网格畸变
+                    try:
+                        transform = A.GridDistortion(num_steps=5, distort_limit=0.3, p=1.0)
+                        augmented = transform(image=augmented)['image']
+                    except:
+                        pass  # 如果失败则跳过
+                        
+            except Exception as e:
+                print(f"[Augmentation] 方法 {method} 失败: {e}")
+                continue
+        
+        return augmented
     
-    def _blur(self, image: np.ndarray) -> Tuple[np.ndarray, str]:
-        """模糊效果（高斯模糊）"""
-        pil_img = Image.fromarray(image)
+    def _numpy_to_base64(self, image: np.ndarray) -> str:
+        """
+        将numpy数组转换为base64字符串
         
-        # 高斯模糊
-        radius = random.uniform(1, 3)
-        blurred = pil_img.filter(ImageFilter.GaussianBlur(radius=radius))
-        
-        return np.array(blurred), f"半径{radius:.1f}"
+        Args:
+            image: numpy数组格式的图像
+            
+        Returns:
+            base64编码的字符串(data URL格式)
+        """
+        pil_image = Image.fromarray(image.astype('uint8'))
+        buffer = BytesIO()
+        pil_image.save(buffer, format='PNG')
+        img_str = base64.b64encode(buffer.getvalue()).decode()
+        return f"data:image/png;base64,{img_str}"
     
-    def _brightness_contrast(self, image: np.ndarray) -> Tuple[np.ndarray, str]:
-        """亮度和对比度调整"""
-        pil_img = Image.fromarray(image)
+    def get_available_methods(self) -> dict:
+        """
+        获取所有可用的增强方法
         
-        # 随机调整亮度
-        brightness_enhancer = ImageEnhance.Brightness(pil_img)
-        brightness_factor = random.uniform(0.6, 1.4)
-        brightened = brightness_enhancer.enhance(brightness_factor)
-        
-        # 随机调整对比度
-        contrast_enhancer = ImageEnhance.Contrast(brightened)
-        contrast_factor = random.uniform(0.6, 1.4)
-        adjusted = contrast_enhancer.enhance(contrast_factor)
-        
-        return np.array(adjusted), f"亮度{brightness_factor:.1f} 对比度{contrast_factor:.1f}"
+        Returns:
+            增强方法字典 {method_key: method_name}
+        """
+        return self.augmentation_methods
 
 
-# 单例模式
+# 全局单例
 _augmentation_service = None
 
 
 def get_augmentation_service() -> AugmentationService:
-    """获取增强服务实例"""
+    """
+    获取数据增强服务单例
+    
+    Returns:
+        AugmentationService实例
+    """
     global _augmentation_service
     if _augmentation_service is None:
         _augmentation_service = AugmentationService()

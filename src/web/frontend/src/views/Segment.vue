@@ -98,7 +98,7 @@
                 <div class="progress-text">{{ uploadStatusText }}</div>
               </div>
               
-              <!-- 单张图片显示预览 -->
+              <!-- 单张图片时显示预览，多张图片时不显示预览 -->
               <div v-if="selectedFiles.length === 1" class="single-preview">
                 <img :src="getFilePreview(selectedFiles[0])" alt="预览" />
                 <div class="file-info">
@@ -115,9 +115,9 @@
                 </div>
               </div>
               
-              <!-- 多张图片显示列表 -->
-              <div v-else>
-                <div v-for="(file, index) in selectedFiles" :key="index" class="file-item">
+              <!-- 多张图片显示文件列表 -->
+              <div v-else class="multi-files-list">
+                <div v-for="(file, index) in selectedFiles.slice(0, 5)" :key="index" class="file-item">
                   <el-icon><Picture /></el-icon>
                   <span class="file-name">{{ file.name }}</span>
                   <el-button 
@@ -128,6 +128,11 @@
                   >
                     删除
                   </el-button>
+                </div>
+                <div v-if="selectedFiles.length > 5" class="more-files">
+                  <el-tag type="info" size="small">
+                    还有 {{ selectedFiles.length - 5 }} 张图片
+                  </el-tag>
                 </div>
               </div>
             </div>
@@ -175,7 +180,7 @@
                 
                 <!-- 批量结果ZIP下载 -->
                 <el-button 
-                  v-if="batchResult && batchResult.zip_file"
+                  v-if="batchResult && batchResult.download_available"
                   type="primary"
                   size="small"
                   @click="downloadBatchZip"
@@ -217,9 +222,6 @@
               <el-tag size="large">
                 处理时间: {{ result.process_time.toFixed(2) }}s
               </el-tag>
-              <el-tag v-if="result.segment_type === 'instance'" type="warning" size="large">
-                检测实例: {{ result.instance_count || 0 }} 个
-              </el-tag>
             </div>
             
             <!-- 图像对比滑块 -->
@@ -250,67 +252,17 @@
               </div>
             </div>
             
-            <!-- 实例分割结果显示 -->
-            <div v-if="result.segment_type === 'instance' && result.bbox_image" class="instance-result">
-              <div class="image-box" style="width: 100%;">
-                <h4>实例检测结果（带边界框）</h4>
-                <img :src="result.bbox_image" alt="实例检测图" style="max-height: 400px;" />
-              </div>
-            </div>
+            <!-- 实例分割结果显示 - 已隐藏边界框图 -->
+            <!-- 实例信息列表 - 已隐藏详情表格 -->
             
-            <!-- 实例信息列表 -->
-            <div v-if="result.segment_type === 'instance' && result.instance_info && result.instance_info.length > 0" class="instance-info">
-              <h4>检测到的实例详情</h4>
-              <el-table :data="result.instance_info" style="width: 100%" max-height="300">
-                <el-table-column prop="id" label="实例ID" width="100" />
-                <el-table-column prop="class_name" label="类别" width="120">
-                  <template #default="scope">
-                    <el-tag :type="getTagType(scope.row.class_id)">
-                      {{ scope.row.class_name }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="area" label="面积（像素）" width="120">
-                  <template #default="scope">
-                    {{ scope.row.area.toLocaleString() }}
-                  </template>
-                </el-table-column>
-                <el-table-column prop="bbox" label="边界框">
-                  <template #default="scope">
-                    [{{ scope.row.bbox.join(', ') }}]
-                  </template>
-                </el-table-column>
-                <el-table-column label="颜色" width="80">
-                  <template #default="scope">
-                    <div 
-                      class="color-preview" 
-                      :style="{ backgroundColor: `rgb(${scope.row.color.join(',')})` }"
-                    ></div>
-                  </template>
-                </el-table-column>
-              </el-table>
             </div>
-            
-            <!-- 图表展示 -->
-            <div class="charts">
-              <div class="chart-box">
-                <h4>各类别IoU分布</h4>
-                <div ref="chartRef" style="width: 100%; height: 300px"></div>
-              </div>
-              
-              <div class="chart-box">
-                <h4>像素分布</h4>
-                <div ref="pieChartRef" style="width: 100%; height: 300px"></div>
-              </div>
-            </div>
-          </div>
           
           <!-- 批量结果展示 -->
           <div v-else-if="batchResult" class="batch-result-content">
             <!-- 批量结果统计 -->
             <div class="batch-summary">
               <el-alert
-                :title="batchResult.message"
+                :title="`批量分割完成：共 ${batchResult.total_count} 张，成功 ${batchResult.processed_count} 张`"
                 type="success"
                 :closable="false"
                 show-icon
@@ -319,27 +271,11 @@
               
               <div class="batch-stats">
                 <el-tag size="large" type="info">总数: {{ batchResult.total_count }}</el-tag>
-                <el-tag size="large" type="success">成功: {{ batchResult.success_count }}</el-tag>
+                <el-tag size="large" type="success">成功: {{ batchResult.processed_count }}</el-tag>
                 <el-tag size="large" type="danger" v-if="batchResult.failed_count > 0">
                   失败: {{ batchResult.failed_count }}
                 </el-tag>
               </div>
-              
-              <!-- 失败文件列表 -->
-              <el-alert
-                v-if="batchResult.failed_count > 0"
-                :title="batchResult.warning"
-                type="warning"
-                :closable="false"
-                show-icon
-                style="margin-top: 12px;"
-              >
-                <ul style="margin: 8px 0 0 20px; padding: 0;">
-                  <li v-for="(failed, idx) in batchResult.failed_files" :key="idx">
-                    {{ failed.filename }}: {{ failed.error }}
-                  </li>
-                </ul>
-              </el-alert>
             </div>
             
             <!-- 直接展示模式（<=3张） -->
@@ -347,7 +283,7 @@
               <h4 style="margin-bottom: 16px;">分割结果</h4>
               <div v-for="(item, index) in batchResult.results" :key="index" class="batch-result-item">
                 <el-divider content-position="left">
-                  <el-tag>{{ item.original_filename }}</el-tag>
+                  <el-tag>{{ item.filename }}</el-tag>
                 </el-divider>
                 
                 <!-- 性能指标 -->
@@ -358,6 +294,16 @@
                   <el-tag type="success">IoU: {{ (item.iou * 100).toFixed(2) }}%</el-tag>
                   <el-tag type="info">准确率: {{ (item.accuracy * 100).toFixed(2) }}%</el-tag>
                   <el-tag>处理时间: {{ item.process_time.toFixed(2) }}s</el-tag>
+                </div>
+                
+                <!-- 图像对比滑块 -->
+                <div class="compare-section">
+                  <h4 style="margin-bottom: 16px;">原图 vs 分割结果对比</h4>
+                  <ImageCompare 
+                    :original-image="item.original_image"
+                    :result-image="item.segmented_image"
+                    style="height: 400px; margin-bottom: 20px;"
+                  />
                 </div>
                 
                 <!-- 图片对比 -->
@@ -390,7 +336,7 @@
               
               <div v-for="(item, index) in batchResult.preview_results" :key="index" class="batch-result-item">
                 <el-divider content-position="left">
-                  <el-tag>{{ item.original_filename }}</el-tag>
+                  <el-tag>{{ item.filename }}</el-tag>
                 </el-divider>
                 
                 <!-- 性能指标 -->
@@ -401,6 +347,16 @@
                   <el-tag type="success">IoU: {{ (item.iou * 100).toFixed(2) }}%</el-tag>
                   <el-tag type="info">准确率: {{ (item.accuracy * 100).toFixed(2) }}%</el-tag>
                   <el-tag>处理时间: {{ item.process_time.toFixed(2) }}s</el-tag>
+                </div>
+                
+                <!-- 图像对比滑块 -->
+                <div class="compare-section">
+                  <h4 style="margin-bottom: 16px;">原图 vs 分割结果对比</h4>
+                  <ImageCompare 
+                    :original-image="item.original_image"
+                    :result-image="item.segmented_image"
+                    style="height: 400px; margin-bottom: 20px;"
+                  />
                 </div>
                 
                 <!-- 图片对比 -->
@@ -419,6 +375,12 @@
                   </div>
                 </div>
               </div>
+              
+              <!-- 提示剩余图片 -->
+              <div v-if="batchResult.total_count > 3" class="remaining-hint">
+                <el-icon><InfoFilled /></el-icon>
+                <span>还有 {{ batchResult.total_count - 3 }} 张图片的分割结果，请点击上方"下载全部结果"按钮获取</span>
+              </div>
             </div>
           </div>
         </el-card>
@@ -428,10 +390,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import * as echarts from 'echarts'
+import { MagicStick, InfoFilled } from '@element-plus/icons-vue'
 import { modelApi, segmentApi } from '@/api/modules'
 import ImageCompare from '@/components/ImageCompare.vue'
 
@@ -442,8 +403,6 @@ const selectedFiles = ref([])
 const segmenting = ref(false)
 const result = ref(null)
 const batchResult = ref(null)
-const chartRef = ref(null)
-const pieChartRef = ref(null)
 
 // 上传进度相关
 const uploading = ref(false)
@@ -457,7 +416,8 @@ const fetchModels = async () => {
       models.value = response.models
       // 默认选择最佳模型
       if (models.value.length > 0) {
-        const bestModel = models.value.find(m => m.name === 'best_model.pth')
+        // 后端返回的name已经去除了.pth后缀
+        const bestModel = models.value.find(m => m.name === 'best_model' || m.name === 'best_model.pth')
         selectedModel.value = bestModel ? bestModel.name : models.value[0].name
       }
     }
@@ -526,10 +486,6 @@ const startSegmentation = async () => {
         batchResult.value = null  // 清空批量结果
         uploadStatusText.value = '分割完成'
         ElMessage.success(`${typeText}完成`)
-        
-        // 渲染图表
-        await nextTick()
-        renderCharts()
       }
     } else {
       // 批量分割
@@ -552,120 +508,6 @@ const startSegmentation = async () => {
       uploading.value = false
     }, 1000) // 延迟1秒隐藏进度条
   }
-}
-
-const renderCharts = () => {
-  if (!result.value) return
-  
-  // IoU柱状图
-  const chart = echarts.init(chartRef.value)
-  const classNames = result.value.class_names || ['Background', 'Road', 'Vehicle', 'Pedestrian']
-  const classIou = result.value.class_iou || [98, 85, 78, 72]
-  
-  // 如果使用默认值，输出警告
-  if (!result.value.class_names || !result.value.class_iou) {
-    console.warn('[警告] 使用默认的类别名称或 IoU 数据，后端可能未正确返回数据')
-  }
-  
-  const iouChartOption = {
-    tooltip: { 
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' }
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      top: '15%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      data: classNames,
-      axisLabel: {
-        interval: 0,
-        rotate: 30,
-        fontSize: 12
-      }
-    },
-    yAxis: { 
-      type: 'value', 
-      name: 'IoU (%)',
-      min: 0,
-      max: 100
-    },
-    series: [{
-      data: classIou.map(v => (v * 100).toFixed(2)),
-      type: 'bar',
-      barWidth: '50%',
-      itemStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: '#1890ff' },
-          { offset: 1, color: '#69c0ff' }
-        ])
-      },
-      label: {
-        show: true,
-        position: 'top',
-        formatter: '{c}%',
-        color: '#333',
-        fontWeight: 'bold',
-        fontSize: 12
-      }
-    }]
-  }
-  chart.setOption(iouChartOption)
-  
-  // 像素分布饼图 - 使用后端返回的数据
-  const pieChart = echarts.init(pieChartRef.value)
-  const pixelDistribution = result.value.pixel_distribution || [60, 20, 15, 5]
-  
-  // 如果使用默认值，输出警告
-  if (!result.value.pixel_distribution) {
-    console.warn('[警告] 使用默认的像素分布数据，后端可能未正确返回数据')
-  }
-  
-  const pieChartOption = {
-    tooltip: { 
-      trigger: 'item',
-      formatter: '{b}: {d}%'
-    },
-    legend: { 
-      orient: 'horizontal',
-      bottom: '5%',
-      itemWidth: 12,
-      itemHeight: 12,
-      textStyle: { fontSize: 11 }
-    },
-    series: [{
-      type: 'pie',
-      radius: ['30%', '55%'],
-      center: ['50%', '45%'],
-      avoidLabelOverlap: true,
-      data: classNames.map((name, idx) => ({
-        value: pixelDistribution[idx],
-        name: name
-      })),
-      label: {
-        show: true,
-        formatter: '{b}\n{d}%',
-        fontSize: 11,
-        lineHeight: 16
-      },
-      labelLine: {
-        length: 10,
-        length2: 10
-      },
-      emphasis: {
-        itemStyle: {
-          shadowBlur: 10,
-          shadowOffsetX: 0,
-          shadowColor: 'rgba(0, 0, 0, 0.5)'
-        }
-      }
-    }]
-  }
-  pieChart.setOption(pieChartOption)
 }
 
 const getTagType = (classId) => {
@@ -700,19 +542,33 @@ const resetAll = () => {
   segmentType.value = 'semantic'
 }
 
-const downloadBatchZip = () => {
-  if (!batchResult.value || !batchResult.value.zip_file) return
+const downloadBatchZip = async () => {
+  if (!batchResult.value || !batchResult.value.task_id) return
   
   try {
+    ElMessage.info('正在准备下载...')
+    
+    // 使用 API 下载
+    const response = await fetch(`/api/segment/download/${batchResult.value.task_id}`)
+    
+    if (!response.ok) {
+      throw new Error('下载失败')
+    }
+    
+    // 获取 blob
+    const blob = await response.blob()
+    
     // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.href = batchResult.value.zip_file
-    link.download = `segmentation_results_${Date.now()}.zip`
+    link.href = url
+    link.download = `segmentation_results_${batchResult.value.task_id.slice(0, 8)}.zip`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
     
-    ElMessage.success('ZIP文件下载中...')
+    ElMessage.success('下载完成')
   } catch (error) {
     console.error('下载失败:', error)
     ElMessage.error('下载失败，请重试')
@@ -1025,22 +881,6 @@ onMounted(() => {
   border: 1px solid #ebeef5;
 }
 
-.charts {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin-top: 24px;
-}
-
-.chart-box {
-  text-align: center;
-}
-
-.chart-box h4 {
-  margin-bottom: 12px;
-  color: #606266;
-}
-
 /* 批量结果样式 */
 .batch-result-content {
   padding: 20px;
@@ -1068,5 +908,47 @@ onMounted(() => {
 
 .batch-result-item .image-comparison {
   margin-top: 12px;
+}
+
+.remaining-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: #f0f9ff;
+  border-radius: 8px;
+  color: #1890ff;
+  font-size: 14px;
+  margin-top: 20px;
+}
+
+.multi-files-tip {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.multi-files-list {
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.multi-files-list .file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.multi-files-list .file-item:last-child {
+  border-bottom: none;
+}
+
+.more-files {
+  margin-top: 8px;
+  text-align: center;
+  padding: 8px;
 }
 </style>

@@ -67,7 +67,9 @@ class Trainer:
                 img_size=tuple(args.img_size),
                 num_workers=args.num_workers,
                 subset_ratio=args.subset_ratio,
-                random_seed=args.random_seed
+                random_seed=args.random_seed,
+                balance_sampling=args.balance_sampling,
+                car_only=getattr(args, 'car_only', False)
             )
 
             self.val_loader: DataLoader = get_dataloader(
@@ -84,29 +86,51 @@ class Trainer:
             self.logger.error(f"数据加载失败: {e}")
             raise DataLoadError("数据加载失败", str(e))
 
+        # MPS兼容性检测
+        if args.deep_supervision and self.device.type == 'mps':
+            self.logger.warning("检测到MPS设备,为了加载预训练模型,保持深度监督开启")
+            self.logger.warning("注意: 这可能在某些情况下导致MPS兼容性问题,但会尝试优先生成")
+        
+        # 创建模型 - 如果有预训练模型,保持其deep_supervision设置
+        use_deep_supervision = args.deep_supervision
+        if args.resume:
+            # 如果要加载预训练模型,先用深度监督创建以匹配权重
+            use_deep_supervision = True  # 预训练模型都是用深度监督训练的
+        
         # 创建模型
         self.logger.info("创建模型...")
         print("\n创建模型...")
         self.model: UNetPlusPlus = UNetPlusPlus(
             in_channels=3,
             num_classes=args.num_classes,
-            deep_supervision=args.deep_supervision,
+            deep_supervision=use_deep_supervision,  # 使用修改后的值
             encoder_name=args.encoder,
             pretrained=args.pretrained
         )
         self.model = self.model.to(self.device)
 
         # 创建损失函数，添加类别权重
-        # 类别权重：根据数据集分布计算
-        # Background: 98.35%, Road: 84.85%, Vehicle: 8.33%, Pedestrian: 37.64%
-        # 权重计算: 1 / sqrt(frequency)，并对车辆类别额外加权
-        class_weights = torch.tensor([0.0165, 0.1515, 12.0, 2.6596], dtype=torch.float32)
-        self.logger.info(f"类别权重: Background={class_weights[0]:.4f}, Road={class_weights[1]:.4f}, Vehicle={class_weights[2]:.4f}, Pedestrian={class_weights[3]:.4f}")
+        # 优化后的类别权重：专注于 Car 类别 IoU 提升
+        # Background: 大量样本 - 最低权重 (降低以减少过预测背景)
+        # Car: 目标类别 - 最高权重 (当前 IoU 52%, 目标 80%)
+        # Truck: 较少样本 - 高权重
+        # Bus: 样本最少 - 高权重
+        class_weights = torch.tensor([0.02, 3.0, 2.5, 4.0], dtype=torch.float32)
+        self.logger.info(f"类别权重: Background={class_weights[0]:.4f}, Car={class_weights[1]:.4f}, Truck={class_weights[2]:.4f}, Bus={class_weights[3]:.4f}")
         
-        base_loss = CombinedLoss(weight_ce=1.0, weight_dice=1.0, class_weights=class_weights)
-        if args.deep_supervision:
+        base_loss = CombinedLoss(
+            weight_ce=1.0, 
+            weight_dice=3.0, 
+            weight_focal=0.0,  # 暂时禁用 Focal Loss 避免 MPS 问题
+            class_weights=class_weights,
+            focal_gamma=2.5
+        )
+        # 使用与模型配置一致的损失函数
+        if use_deep_supervision:
+            self.logger.info("使用深度监督损失函数")
             self.criterion: nn.Module = DeepSupervisionLoss(base_loss)
         else:
+            self.logger.info("使用基础损失函数")
             self.criterion = base_loss
 
         # 创建优化器
@@ -230,8 +254,9 @@ class Trainer:
         print(f"  - 训练轮数: {self.args.epochs}")
         print(f"  - 图像尺寸: {self.args.img_size}")
         print(f"  - 类别数: {self.args.num_classes}")
-        print(f"  - 深度监督: {self.args.deep_supervision}")
-        self.logger.info(f"训练配置: batch_size={self.args.batch_size}, lr={self.args.lr}, epochs={self.args.epochs}")
+        print(f"  - 深度监督: {self.model.deep_supervision if hasattr(self.model, 'deep_supervision') else 'Unknown'}")
+        print(f"  - 设备: {self.device}")
+        self.logger.info(f"训练配置: batch_size={self.args.batch_size}, lr={self.args.lr}, epochs={self.args.epochs}, device={self.device}")
 
     def train_epoch(self, epoch: int) -> Tuple[float, float, float]:
         """
@@ -269,11 +294,16 @@ class Trainer:
             self.optimizer.zero_grad()
             outputs = self.model(images)
 
-            # 计算损失
+            # 计算损失 - 设备兼容性处理
             loss = self.criterion(outputs, masks)
 
             # 反向传播
             loss.backward()
+            
+            # 梯度裁剪,防止梯度爆炸
+            if self.args.grad_clip > 0:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_clip)
+            
             self.optimizer.step()
 
             # 计算指标
@@ -377,7 +407,11 @@ class Trainer:
 
         self.logger.info(f"Val Epoch {epoch} - Loss: {avg_loss:.4f}, IoU: {avg_iou:.4f}, Acc: {avg_acc:.4f}")
         print(f"Val   - Loss: {avg_loss:.4f}, IoU: {avg_iou:.4f}, Acc: {avg_acc:.4f}")
-
+        
+        # 打印学习率
+        current_lr = self.optimizer.param_groups[0]['lr']
+        print(f"当前学习率: {current_lr:.2e}")
+        
         return avg_loss, avg_iou, avg_acc
 
     def _adjust_learning_rate_on_iou_drop(self, val_iou: float) -> None:
@@ -476,10 +510,12 @@ class Trainer:
         }
 
         if is_best:
-            checkpoint_path = os.path.join(self.args.output_dir, 'checkpoints', 'best_model.pth')
+            # 使用自定义模型名称（如果有）
+            model_name = getattr(self.args, 'model_name', 'best_model') + '.pth'
+            checkpoint_path = os.path.join(self.args.output_dir, 'checkpoints', model_name)
             torch.save(checkpoint, checkpoint_path)
             self.logger.info(f"保存最佳模型 (IoU: {self.best_iou:.4f})")
-            print(f"保存最佳模型 (IoU: {self.best_iou:.4f})")
+            print(f"保存最佳模型 (IoU: {self.best_iou:.4f}) -> {model_name}")
         else:
             checkpoint_path = os.path.join(self.args.output_dir, 'checkpoints', f'model_epoch_{epoch}.pth')
             torch.save(checkpoint, checkpoint_path)
@@ -494,7 +530,7 @@ def main() -> None:
     # 数据参数
     parser.add_argument('--data_dir', type=str, default='road_vehicle_pedestrian_det_datasets',
                         help='数据集根目录')
-    parser.add_argument('--masks_dir', type=str, default='outputs/masks',
+    parser.add_argument('--masks_dir', type=str, default='outputs/masks_car',
                         help='掩码目录')
     parser.add_argument('--output_dir', type=str, default='outputs',
                         help='输出目录')
@@ -519,14 +555,16 @@ def main() -> None:
                         help='学习率')
     parser.add_argument('--weight_decay', type=float, default=1e-5,
                         help='权重衰减')
+    parser.add_argument('--grad_clip', type=float, default=1.0,
+                        help='梯度裁剪阈值, 0表示不裁剪 (默认: 1.0)')
     parser.add_argument('--img_size', type=int, nargs=2, default=[512, 512],
                         help='输入图像尺寸')
     parser.add_argument('--num_workers', type=int, default=4,
                         help='数据加载工作进程数')
 
     # 设备参数
-    parser.add_argument('--use_gpu', type=bool, default=False,
-                        help='是否使用GPU训练 (默认: False, 使用CPU，如果为True会优先使用MPS，然后CUDA)')
+    parser.add_argument('--use_gpu', action='store_true',
+                        help='使用GPU训练 (默认使用CPU，添加此参数启用GPU)')
 
     # 数据子集参数
     parser.add_argument('--subset_ratio', type=float, default=1.0,
@@ -537,6 +575,8 @@ def main() -> None:
     # 其他参数
     parser.add_argument('--save_interval', type=int, default=10,
                         help='保存检查点的间隔')
+    parser.add_argument('--balance_sampling', action='store_true',
+                        help='使用类别平衡采样 (默认: False)')
 
     # 模型加载参数
     parser.add_argument('--resume', type=str, default=None,
@@ -555,6 +595,14 @@ def main() -> None:
                         help='最小学习率,防止学习率过低导致过拟合 (默认: 3e-5)')
     parser.add_argument('--lr_adjustment_factor', type=float, default=0.6,
                         help='学习率调整因子,当IoU下降时学习率乘以该因子 (默认: 0.6)')
+    
+    # 模型名称参数
+    parser.add_argument('--model_name', type=str, default='best_model',
+                        help='最佳模型保存的名称(不带.pth后缀) (默认: best_model)')
+    
+    # Car 专项训练参数
+    parser.add_argument('--car_only', action='store_true',
+                        help='只使用包含Car的样本进行训练 (默认: False)')
 
     args = parser.parse_args()
 
