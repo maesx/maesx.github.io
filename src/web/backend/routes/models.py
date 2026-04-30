@@ -197,14 +197,15 @@ class ModelDetailResource(Resource):
                 'error': str(e)
             }), 500
 
-    @require_role('admin')
-    def delete(self, model_name, current_user=None):
+    def delete(self, model_name):
         """
-        删除指定模型（需要管理员权限）
+        删除指定模型
+        
+        注意: 当前版本暂时移除管理员权限验证
+        TODO: 在完善用户系统后恢复权限验证
 
         Args:
             model_name: 模型名称
-            current_user: 当前用户（由装饰器注入）
 
         Returns:
             删除结果
@@ -231,7 +232,7 @@ class ModelDetailResource(Resource):
 
                 # 记录操作日志
                 _log_operation(
-                    user_id=current_user.get('user_id') if current_user else None,
+                    user_id=None,
                     operation_type='delete',
                     resource_type='model',
                     resource_id=model_id,
@@ -259,13 +260,12 @@ class ModelDetailResource(Resource):
 class ModelUploadResource(Resource):
     """模型上传资源"""
 
-    @require_role('admin')
-    def post(self, current_user=None):
+    def post(self):
         """
-        上传自定义模型文件（需要管理员权限）
-
-        Args:
-            current_user: 当前用户（由装饰器注入）
+        上传自定义模型文件
+        
+        注意: 当前版本暂时移除管理员权限验证
+        TODO: 在完善用户系统后恢复权限验证
 
         Returns:
             上传结果
@@ -344,11 +344,11 @@ class ModelUploadResource(Resource):
 
             if model_info:
                 # 保存到数据库
-                model_id = _save_model_to_db(model_info, current_user.get('user_id') if current_user else None)
+                model_id = _save_model_to_db(model_info, user_id=None)
 
                 # 记录操作日志
                 _log_operation(
-                    user_id=current_user.get('user_id') if current_user else None,
+                    user_id=None,
                     operation_type='upload',
                     resource_type='model',
                     resource_id=model_id,
