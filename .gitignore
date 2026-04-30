@@ -38,6 +38,7 @@ road_vehicle_pedestrian_det_datasets/
 # 输出文件 - 使用Git LFS管理模型文件
 outputs/logs/
 outputs/masks/
+outputs/masks_car/
 outputs/test_results/
 outputs/visualizations/
 outputs/results/
