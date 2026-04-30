@@ -68,6 +68,13 @@ export const segmentApi = {
   },
 
   /**
+   * 删除历史记录
+   */
+  deleteHistory(recordId) {
+    return api.delete(`/segment/history/${recordId}`)
+  },
+
+  /**
    * 获取对比列表
    */
   getCompareList() {

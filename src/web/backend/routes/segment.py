@@ -859,19 +859,89 @@ class CompareListResource(Resource):
         cls.compare_list.append(item)
 
 
+class SegmentDeleteResource(Resource):
+    """删除分割历史记录资源"""
+    
+    def delete(self, record_id):
+        """
+        删除指定的分割历史记录
+        
+        Args:
+            record_id: 记录ID
+            
+        Returns:
+            删除结果
+        """
+        try:
+            # 尝试从数据库删除
+            from src.web.backend.database.session import get_db_session
+            from src.web.backend.database.models.segmentation import SegmentationRecord
+            
+            with get_db_session() as session:
+                if session is not None:
+                    # 从数据库删除
+                    record = session.query(SegmentationRecord).filter_by(id=int(record_id)).first()
+                    
+                    if record:
+                        session.delete(record)
+                        session.commit()
+                        return {
+                            'success': True,
+                            'message': f'记录 {record_id} 已删除',
+                            'source': 'database'
+                        }
+                    else:
+                        return {
+                            'success': False,
+                            'error': f'记录 {record_id} 不存在'
+                        }, 404
+                else:
+                    # 数据库未启用，从内存删除
+                    if not hasattr(SegmentHistoryResource, '_memory_records'):
+                        return {
+                            'success': False,
+                            'error': '记录不存在'
+                        }, 404
+                    
+                    # 从内存列表中删除
+                    memory_records = SegmentHistoryResource._memory_records
+                    for idx, record in enumerate(memory_records):
+                        if record.get('id') == record_id:
+                            memory_records.pop(idx)
+                            return {
+                                'success': True,
+                                'message': f'记录 {record_id} 已删除',
+                                'source': 'memory'
+                            }
+                    
+                    return {
+                        'success': False,
+                        'error': f'记录 {record_id} 不存在'
+                    }, 404
+                    
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                'success': False,
+                'error': f'删除失败: {str(e)}'
+            }, 500
+
+
 class CompareAddResource(Resource):
     """添加对比项资源"""
     
     def post(self, result_id):
         """添加到对比列表"""
-        # 从历史记录中查找
-        for record in SegmentHistoryResource.history_records:
-            if record.get('id') == result_id:
-                CompareListResource.add_to_compare(record)
-                return {
-                    'success': True,
-                    'message': '已添加到对比列表'
-                }
+        # 从历史记录中查找 (兼容内存存储)
+        if hasattr(SegmentHistoryResource, '_memory_records'):
+            for record in SegmentHistoryResource._memory_records:
+                if record.get('id') == result_id:
+                    CompareListResource.add_to_compare(record)
+                    return {
+                        'success': True,
+                        'message': '已添加到对比列表'
+                    }
         
         return {
             'success': False,

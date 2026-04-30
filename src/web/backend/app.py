@@ -85,6 +85,7 @@ def create_app(config_class=Config):
     from src.web.backend.routes.models import ModelsResource, ModelDetailResource, ModelUploadResource
     from src.web.backend.routes.segment import (
         SegmentResource, BatchSegmentResource, SegmentHistoryResource,
+        SegmentDeleteResource,
         CompareListResource, CompareAddResource, CompareRemoveResource, CompareClearResource,
         BatchDownloadResource
     )
@@ -118,6 +119,7 @@ def create_app(config_class=Config):
     api.add_resource(BatchSegmentResource, '/api/segment/batch')
     api.add_resource(BatchDownloadResource, '/api/segment/download/<string:task_id>')
     api.add_resource(SegmentHistoryResource, '/api/segment/history')
+    api.add_resource(SegmentDeleteResource, '/api/segment/history/<string:record_id>')
     
     # 结果对比
     api.add_resource(CompareListResource, '/api/segment/compare/list')

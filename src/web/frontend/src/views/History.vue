@@ -162,16 +162,24 @@ const deleteRecord = async (row) => {
       type: 'warning'
     })
     
-    // 从本地列表中移除（使用原始ID匹配）
-    const index = historyList.value.findIndex(item => item.id === row.id)
-    if (index > -1) {
-      historyList.value.splice(index, 1)
-      ElMessage.success('已删除')
+    // 调用后端API删除
+    const response = await segmentApi.deleteHistory(row.id)
+    
+    if (response.success) {
+      // 从本地列表中移除
+      const index = historyList.value.findIndex(item => item.id === row.id)
+      if (index > -1) {
+        historyList.value.splice(index, 1)
+      }
+      ElMessage.success(response.message || '删除成功')
+    } else {
+      ElMessage.error(response.error || '删除失败')
     }
   } catch (error) {
     // 用户取消删除
     if (error !== 'cancel') {
       console.error('删除失败:', error)
+      ElMessage.error('删除失败')
     }
   }
 }
